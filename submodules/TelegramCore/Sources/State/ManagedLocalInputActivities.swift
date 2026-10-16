@@ -1,4 +1,5 @@
 import Foundation
+import SGSimpleSettings
 import Postbox
 import SwiftSignalKit
 import TelegramApi
@@ -142,6 +143,15 @@ private func actionFromActivity(_ activity: PeerInputActivity?) -> Api.SendMessa
 }
 
 private func requestActivity(postbox: Postbox, network: Network, accountPeerId: PeerId, peerId: PeerId, threadId: Int64?, activity: PeerInputActivity?) -> Signal<Void, NoError> {
+    if SGPrivacySettings.hideTyping, let activity = activity {
+        // Speaking indicators are needed for calls; nil still sends a typing cancellation.
+        switch activity {
+        case .speakingInGroupCall:
+            break
+        default:
+            return .complete()
+        }
+    }
     return postbox.transaction { transaction -> Signal<Void, NoError> in
         if let peer = transaction.getPeer(peerId) {
             if peerId == accountPeerId {

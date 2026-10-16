@@ -27,6 +27,7 @@ import UndoUI
 
 private enum SGControllerSection: Int32, SGItemListSection {
     case search
+    case localPrivacy
     case trending
     case content
     case tabs
@@ -46,6 +47,10 @@ private enum SGControllerSection: Int32, SGItemListSection {
 }
 
 private enum SGBoolSetting: String {
+    case modHideOnline
+    case modHideTyping
+    case modHideReadReceipts
+    case modKeepDeletedMessages
     case hidePhoneInSettings
     case showTabNames
     case showContactsTab
@@ -125,6 +130,7 @@ private enum SGSliderSetting: String {
 }
 
 private enum SGDisclosureLink: String {
+    case deletedMessages
     case contentSettings
     case languageSettings
 }
@@ -150,6 +156,15 @@ private func SGControllerEntries(presentationData: PresentationData, callListSet
     let id = SGItemListCounter()
     
     entries.append(.searchInput(id: id.count, section: .search, title: NSAttributedString(string: "🔍"), text: state.searchQuery ?? "", placeholder: strings.Common_Search))
+    let modRu = lang.hasPrefix("ru")
+    entries.append(.header(id: id.count, section: .localPrivacy, text: modRu ? "Режим призрака" : "Ghost mode", badge: nil))
+    entries.append(.toggle(id: id.count, section: .localPrivacy, settingName: .modHideOnline, value: SGPrivacySettings.hideOnline, text: modRu ? "Скрывать онлайн" : "Hide online status", enabled: true))
+    entries.append(.toggle(id: id.count, section: .localPrivacy, settingName: .modHideTyping, value: SGPrivacySettings.hideTyping, text: modRu ? "Скрывать набор текста и запись" : "Hide typing and recording", enabled: true))
+    entries.append(.toggle(id: id.count, section: .localPrivacy, settingName: .modHideReadReceipts, value: SGPrivacySettings.hideReadReceipts, text: modRu ? "Не отправлять прочтение" : "Do not send read receipts", enabled: true))
+    entries.append(.notice(id: id.count, section: .localPrivacy, text: modRu ? "Действует только в этом клиенте. Прочтение скрывается в облачных чатах и темах. Секретные чаты и просмотры историй работают как обычно. Отправка сообщения, реакция или звонок могут раскрыть активность. Уже отправленные отметки отменить нельзя." : "Only affects this client. Read receipts are suppressed in cloud chats and threads. Secret chats and story views work as usual. Sending a message, reacting or calling can reveal activity. Previously sent receipts cannot be undone."))
+    entries.append(.toggle(id: id.count, section: .localPrivacy, settingName: .modKeepDeletedMessages, value: SGPrivacySettings.keepDeletedMessages, text: modRu ? "Сохранять удалённые сообщения" : "Keep deleted messages", enabled: true))
+    entries.append(.disclosure(id: id.count, section: .localPrivacy, link: .deletedMessages, text: modRu ? "Архив удалённых сообщений" : "Deleted message archive"))
+    entries.append(.notice(id: id.count, section: .localPrivacy, text: modRu ? "Архив сохраняет текст уже полученных входящих сообщений после включения опции: до 200 записей и 4096 символов в каждой. Без фото, файлов, секретных и исчезающих сообщений. Скрытое время посещения собеседника сервер не предоставляет." : "Saves text from incoming messages already received after you enable this option: up to 200 entries and 4096 characters each. Photos, files, secret and disappearing messages are excluded. The server does not provide a contact's hidden last-seen time."))
     
     
     if SGSimpleSettings.shared.canUseNY {
@@ -364,6 +379,18 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
           }
         },*/ setBoolValue: { setting, value in
         switch setting {
+        case .modHideOnline:
+            SGPrivacySettings.hideOnline = value
+            simplePromise.set(true)
+        case .modHideTyping:
+            SGPrivacySettings.hideTyping = value
+            simplePromise.set(true)
+        case .modHideReadReceipts:
+            SGPrivacySettings.hideReadReceipts = value
+            simplePromise.set(true)
+        case .modKeepDeletedMessages:
+            SGPrivacySettings.keepDeletedMessages = value
+            simplePromise.set(true)
         case .hidePhoneInSettings:
             SGSimpleSettings.shared.hidePhoneInSettings = value
             askForRestart?()
@@ -682,6 +709,8 @@ public func sgSettingsController(context: AccountContext/*, focusOnItemTag: Int?
         presentControllerImpl?(actionSheet, ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
     }, openDisclosureLink: { link in
         switch (link) {
+            case .deletedMessages:
+                pushControllerImpl?(sgDeletedMessagesController(context: context))
             case .languageSettings:
                 pushControllerImpl?(context.sharedContext.makeLocalizationListController(context: context))
             case .contentSettings:

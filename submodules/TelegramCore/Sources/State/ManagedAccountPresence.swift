@@ -1,4 +1,5 @@
 import Foundation
+import SGSimpleSettings
 import TelegramApi
 import Postbox
 import SwiftSignalKit
@@ -15,12 +16,19 @@ private final class AccountPresenceManagerImpl {
     private var shouldKeepOnlinePresenceDisposable: Disposable?
     private let currentRequestDisposable = MetaDisposable()
     private var onlineTimer: SignalKitTimer?
+    private var privacyObserver: NSObjectProtocol?
     
     private var wasOnline: Bool = false
     
     init(queue: Queue, shouldKeepOnlinePresence: Signal<Bool, NoError>, network: Network) {
         self.queue = queue
         self.network = network
+        self.privacyObserver = NotificationCenter.default.addObserver(forName: SGPrivacySettings.changed, object: nil, queue: nil) { [weak self] _ in
+            self?.queue.async { [weak self] in
+                guard let self = self else { return }
+                self.updatePresence(self.wasOnline)
+            }
+        }
         
         self.shouldKeepOnlinePresenceDisposable = (shouldKeepOnlinePresence
         |> distinctUntilChanged
@@ -40,10 +48,14 @@ private final class AccountPresenceManagerImpl {
         self.shouldKeepOnlinePresenceDisposable?.dispose()
         self.currentRequestDisposable.dispose()
         self.onlineTimer?.invalidate()
+        if let observer = self.privacyObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
     private func updatePresence(_ isOnline: Bool) {
         let request: Signal<Api.Bool, MTRpcError>
+        self.onlineTimer?.invalidate()
         if isOnline {
             let timer = SignalKitTimer(timeout: 30.0, repeat: false, completion: { [weak self] in
                 guard let strongSelf = self else {
@@ -53,7 +65,7 @@ private final class AccountPresenceManagerImpl {
             }, queue: self.queue)
             self.onlineTimer = timer
             timer.start()
-            request = self.network.request(Api.functions.account.updateStatus(offline: .boolFalse))
+            request = self.network.request(Api.functions.account.updateStatus(offline: SGPrivacySettings.hideOnline ? .boolTrue : .boolFalse))
         } else {
             self.onlineTimer?.invalidate()
             self.onlineTimer = nil

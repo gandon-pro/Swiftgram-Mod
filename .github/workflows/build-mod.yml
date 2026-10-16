@@ -1,0 +1,117 @@
+name: Build Swiftgram Mod
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'check = Swift syntax; ipa = build for iPhone (requires API secrets)'
+        required: true
+        default: check
+        type: choice
+        options:
+          - check
+          - ipa
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swiftgram-mod-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-26-intel
+    timeout-minutes: 180
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Select the Xcode version required by Swiftgram
+        run: |
+          set -euo pipefail
+          version=$(python3 -c 'import json; print(json.load(open("versions.json"))["xcode"])')
+          developer="/Applications/Xcode_${version}.app/Contents/Developer"
+          if [[ ! -d "$developer" ]]; then
+            echo "::error::Required Xcode $version is unavailable on this runner."
+            exit 1
+          fi
+          sudo xcode-select -s "$developer"
+          xcodebuild -version
+          df -h .
+
+      - name: Parse changed Swift sources using the real Swift compiler
+        run: python3 mod-tools/check-swift.py
+
+      - name: Write build configuration from repository secrets
+        if: inputs.mode == 'ipa'
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: python3 mod-tools/configure-ci.py
+
+      - name: Fetch pinned dependencies
+        if: inputs.mode == 'ipa'
+        run: git submodule update --init --recursive --jobs 4
+
+      - name: Import the upstream test signing identity
+        if: inputs.mode == 'ipa'
+        run: python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
+
+      - name: Compile iPhone IPA
+        if: inputs.mode == 'ipa'
+        run: |
+          set -euo pipefail
+          python3 -u build-system/Make/Make.py \
+            --cacheDir="$RUNNER_TEMP/swiftgram-bazel-cache" \
+            build \
+            --configurationPath=build-input/mod-ci-configuration.json \
+            --codesigningInformationPath=build-system/fake-codesigning \
+            --buildNumber="$GITHUB_RUN_NUMBER" \
+            --configuration=release_arm64
+
+      - name: Prepare artifact for signing on Windows
+        if: inputs.mode == 'ipa'
+        run: |
+          set -euo pipefail
+          mkdir -p build/mod-artifacts
+          test -s bazel-bin/Telegram/Swiftgram.ipa
+          cp bazel-bin/Telegram/Swiftgram.ipa build/mod-artifacts/Swiftgram-Mod-resign-required.ipa
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path('build/mod-artifacts')
+          ipa = root / 'Swiftgram-Mod-resign-required.ipa'
+          info = {'commit': os.environ['GITHUB_SHA'], 'run': os.environ['GITHUB_RUN_ID'],
+                  'sha256': hashlib.sha256(ipa.read_bytes()).hexdigest(),
+                  'signing': 'Upstream test identity. Re-sign with your own Apple ID before installing.',
+                  'tested_on_device': False}
+          (root / 'build-info.json').write_text(json.dumps(info, indent=2))
+          (root / 'INSTALL.txt').write_text('This IPA uses an upstream test signature. It must be re-signed before installation. Use a signing tool on Windows such as AltStore Classic. A successful CI build does not verify behavior on iPhone.\n')
+          PY
+
+      - name: Upload IPA (no public release)
+        if: inputs.mode == 'ipa'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Swiftgram-Mod-IPA-${{ github.run_number }}
+          path: build/mod-artifacts/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Record check result
+        if: inputs.mode == 'check'
+        run: |
+          echo 'Swift syntax checks passed. This mode does not compile or produce an IPA.' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove generated configuration
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for name in ('build-input/mod-ci-configuration.json', 'build-input/configuration-repository/variables.bzl'):
+              Path(name).unlink(missing_ok=True)
+          PY

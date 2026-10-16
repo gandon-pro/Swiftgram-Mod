@@ -1,4 +1,5 @@
 import Foundation
+import SGSimpleSettings
 import Postbox
 import SwiftSignalKit
 import TelegramApi
@@ -943,6 +944,7 @@ public final class AccountViewTracker {
     }
     
     public func updateSeenLiveLocationForMessageIds(messageIds: Set<MessageId>) {
+        if SGPrivacySettings.hideReadReceipts { return }
         self.queue.async {
             var addedMessageIds: [MessageId] = []
             let timestamp = Int32(CFAbsoluteTimeGetCurrent())

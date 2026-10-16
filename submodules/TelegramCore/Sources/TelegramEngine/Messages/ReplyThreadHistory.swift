@@ -1,4 +1,5 @@
 import Foundation
+import SGSimpleSettings
 import Postbox
 import SwiftSignalKit
 import TelegramApi
@@ -474,6 +475,11 @@ private class ReplyThreadHistoryContextImpl {
                         revalidate = true
                     }
                 }
+            }
+
+            if SGPrivacySettings.hideReadReceipts {
+                strongSelf.readDisposable.set(nil)
+                return
             }
 
             if let subPeerId {
