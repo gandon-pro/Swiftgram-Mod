@@ -57,6 +57,20 @@ jobs:
         if: inputs.mode == 'ipa'
         run: git submodule update --init --recursive --jobs 4
 
+      - name: Install architecture-matched Bazel with checksum verification
+        if: inputs.mode == 'ipa'
+        run: |
+          set -euo pipefail
+          version=$(python3 -c 'import json; print(json.load(open("versions.json"))["bazel"].split(":")[0])')
+          binary="bazel-${version}-darwin-x86_64"
+          url="https://github.com/bazelbuild/bazel/releases/download/${version}/${binary}"
+          curl --fail --location --retry 3 "$url" --output "$RUNNER_TEMP/$binary"
+          curl --fail --location --retry 3 "$url.sha256" --output "$RUNNER_TEMP/bazel.sha256"
+          expected=$(awk '{print $1}' "$RUNNER_TEMP/bazel.sha256")
+          printf '%s  %s\n' "$expected" "$RUNNER_TEMP/$binary" | shasum -a 256 -c -
+          chmod +x "$RUNNER_TEMP/$binary"
+          echo "BAZEL_PATH=$RUNNER_TEMP/$binary" >> "$GITHUB_ENV"
+
       - name: Import the upstream test signing identity
         if: inputs.mode == 'ipa'
         run: python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
@@ -66,6 +80,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -u build-system/Make/Make.py \
+            --bazel="$BAZEL_PATH" \
             --cacheDir="$RUNNER_TEMP/swiftgram-bazel-cache" \
             build \
             --configurationPath=build-input/mod-ci-configuration.json \
