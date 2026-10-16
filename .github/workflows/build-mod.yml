@@ -46,6 +46,10 @@ jobs:
       - name: Parse changed Swift sources using the real Swift compiler
         run: python3 mod-tools/check-swift.py
 
+      - name: Install the Metal compiler component
+        if: inputs.mode == 'ipa'
+        run: xcodebuild -downloadComponent MetalToolchain
+
       - name: Write build configuration from repository secrets
         if: inputs.mode == 'ipa'
         env:
