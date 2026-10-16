@@ -19,6 +19,7 @@ private final class AccountPresenceManagerImpl {
     private var privacyObserver: NSObjectProtocol?
     
     private var wasOnline: Bool = false
+    private var requestedOnline: Bool?
     
     init(queue: Queue, shouldKeepOnlinePresence: Signal<Bool, NoError>, network: Network) {
         self.queue = queue
@@ -54,8 +55,15 @@ private final class AccountPresenceManagerImpl {
     }
     
     private func updatePresence(_ isOnline: Bool) {
+        let isOnline = isOnline && !SGPrivacySettings.hideOnline
         let request: Signal<Api.Bool, MTRpcError>
         self.onlineTimer?.invalidate()
+        self.onlineTimer = nil
+        // Do not keep updating "last seen" with periodic offline requests in ghost mode.
+        if !isOnline && self.requestedOnline == false {
+            return
+        }
+        self.requestedOnline = isOnline
         if isOnline {
             let timer = SignalKitTimer(timeout: 30.0, repeat: false, completion: { [weak self] in
                 guard let strongSelf = self else {
@@ -65,7 +73,7 @@ private final class AccountPresenceManagerImpl {
             }, queue: self.queue)
             self.onlineTimer = timer
             timer.start()
-            request = self.network.request(Api.functions.account.updateStatus(offline: SGPrivacySettings.hideOnline ? .boolTrue : .boolFalse))
+            request = self.network.request(Api.functions.account.updateStatus(offline: .boolFalse))
         } else {
             self.onlineTimer?.invalidate()
             self.onlineTimer = nil
