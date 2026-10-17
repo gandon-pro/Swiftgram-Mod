@@ -46,6 +46,12 @@ jobs:
       - name: Parse changed Swift sources using the real Swift compiler
         run: python3 mod-tools/check-swift.py
 
+      - name: Test storage initialization without App Groups entitlement
+        run: |
+          set -euo pipefail
+          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGAppStorage.swift mod-tools/tests/SGAppStorageTests.swift -o "$RUNNER_TEMP/sg-app-storage-tests"
+          "$RUNNER_TEMP/sg-app-storage-tests"
+
       - name: Install the Metal compiler component
         if: inputs.mode == 'ipa'
         run: xcodebuild -downloadComponent MetalToolchain

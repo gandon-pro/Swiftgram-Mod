@@ -303,7 +303,11 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         let appGroupName = "group.\(baseAppBundleId)"
 
         let configuration = URLSessionConfiguration.background(withIdentifier: identifier)
-        configuration.sharedContainerIdentifier = appGroupName
+        // ESign and personal-team signatures can omit the App Groups entitlement.
+        // A background session without a shared container uses the app sandbox.
+        if FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName) != nil {
+            configuration.sharedContainerIdentifier = appGroupName
+        }
         configuration.isDiscretionary = false
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: .main)
         self.urlSessions.append(session)
@@ -547,7 +551,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         
         let baseAppBundleId = Bundle.main.bundleIdentifier!
         let appGroupName = "group.\(baseAppBundleId)"
-        let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
+        let privateContainer = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         
         let buildConfig = BuildConfig(baseAppBundleId: baseAppBundleId)
         self.buildConfig = buildConfig
@@ -659,8 +663,31 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             isICloudEnabled: buildConfig.isICloudEnabled
         )
         
-        guard let appGroupUrl = maybeAppGroupUrl else {
-            self.mainWindow?.presentNative(UIAlertController(title: nil, message: "Error 2", preferredStyle: .alert))
+        let appGroupUrl: URL
+        do {
+            appGroupUrl = try SGAppStorage.resolve(
+                appGroupIdentifier: appGroupName,
+                groupContainer: { FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: $0) },
+                privateContainer: privateContainer
+            )
+        } catch {
+            // Always show an actual screen if storage cannot be initialized.
+            let controller = UIViewController()
+            controller.view.backgroundColor = .systemBackground
+            let label = UILabel()
+            label.text = "Niggagram could not initialize local storage.\n\(error.localizedDescription)"
+            label.textColor = .label
+            label.numberOfLines = 0
+            label.textAlignment = .center
+            label.translatesAutoresizingMaskIntoConstraints = false
+            controller.view.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: controller.view.safeAreaLayoutGuide.leadingAnchor, constant: 24),
+                label.trailingAnchor.constraint(equalTo: controller.view.safeAreaLayoutGuide.trailingAnchor, constant: -24),
+                label.centerYAnchor.constraint(equalTo: controller.view.centerYAnchor)
+            ])
+            self.window?.rootViewController = controller
+            self.window?.makeKeyAndVisible()
             return true
         }
         

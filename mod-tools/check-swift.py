@@ -4,6 +4,9 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 paths = [
+    "Swiftgram/SGSimpleSettings/Sources/SGAppStorage.swift",
+    "submodules/TelegramUI/Sources/AppDelegate.swift",
+    "mod-tools/tests/SGAppStorageTests.swift",
     "Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift",
     "submodules/TelegramCore/Sources/Account/AccountManager.swift",
     "submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift",
