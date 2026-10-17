@@ -8,6 +8,17 @@ public enum SGPrivacySettings {
     public static let changed = Notification.Name("Swiftgram.LocalPrivacySettingsChanged")
     public static let messageSent = Notification.Name("Niggagram.MessageSent")
 
+    public static var swiftpseudoPro: Bool {
+        get { preference("sg.mod.swiftpseudoPro", defaultValue: false) }
+        set { set(newValue, for: "sg.mod.swiftpseudoPro") }
+    }
+
+    /// Local client features only. Never changes the stored purchase status,
+    /// StoreKit receipts or the server subscription associated with an account.
+    public static func allowsLocalPro(status: Int64) -> Bool {
+        return swiftpseudoPro || status > 1
+    }
+
     private static func preference(_ key: String, defaultValue: Bool = true) -> Bool {
         return UserDefaults.standard.object(forKey: key) as? Bool ?? defaultValue
     }

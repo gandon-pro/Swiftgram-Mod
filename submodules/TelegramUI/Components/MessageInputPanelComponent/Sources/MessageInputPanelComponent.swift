@@ -3144,7 +3144,7 @@ extension MessageInputPanelComponent.View {
     func initToolbarIfNeeded(context: AccountContext) {
         guard #available(iOS 13.0, *) else { return }
         guard SGSimpleSettings.shared.inputToolbar else { return }
-        guard context.sharedContext.immediateSGStatus.status > 1 else { return }
+        guard SGPrivacySettings.allowsLocalPro(status: context.sharedContext.immediateSGStatus.status) else { return }
         guard self.toolbarView == nil else { return }
         let notificationName = Notification.Name("sgToolbarAction")
         let toolbar = ChatToolbarView(

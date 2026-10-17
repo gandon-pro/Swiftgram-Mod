@@ -4,7 +4,7 @@ import Foundation
 struct SGPrivacySettingsTests {
     static func main() {
         let defaults = UserDefaults.standard
-        let keys = ["ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
+        let keys = ["swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
         let old = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, old) {
@@ -12,6 +12,16 @@ struct SGPrivacySettingsTests {
             }
         }
         for key in keys { defaults.removeObject(forKey: key) }
+        precondition(!SGPrivacySettings.swiftpseudoPro)
+        precondition(!SGPrivacySettings.allowsLocalPro(status: 1))
+        precondition(SGPrivacySettings.allowsLocalPro(status: 2))
+        SGPrivacySettings.swiftpseudoPro = true
+        precondition(defaults.bool(forKey: "sg.mod.swiftpseudoPro"))
+        precondition(SGPrivacySettings.allowsLocalPro(status: 1))
+        precondition(SGPrivacySettings.allowsLocalPro(status: 2))
+        SGPrivacySettings.swiftpseudoPro = false
+        precondition(!SGPrivacySettings.allowsLocalPro(status: 1))
+        precondition(SGPrivacySettings.allowsLocalPro(status: 2), "Disabling pseudo-Pro must preserve real Pro access")
         precondition(!SGPrivacySettings.ghostMode)
         precondition(SGPrivacySettings.deletedMessagesLimit == 200)
         SGPrivacySettings.deletedMessagesLimit = 3500

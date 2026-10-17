@@ -1,3 +1,4 @@
+import SGSimpleSettings
 import SGDebugUI
 import SGSettingsUI
 import UndoUI
@@ -893,7 +894,7 @@ func openExternalUrlImpl(context: AccountContext, urlContext: OpenURLContext, ur
                                 }
                                 return
                             case "pro", "premium", "buy":
-                                if context.sharedContext.immediateSGStatus.status > 1 {
+                                if SGPrivacySettings.allowsLocalPro(status: context.sharedContext.immediateSGStatus.status) {
                                     navigationController?.pushViewController(context.sharedContext.makeSGProController(context: context))
                                 } else {
                                     if let lastViewController = navigationController?.viewControllers.last as? ViewController {

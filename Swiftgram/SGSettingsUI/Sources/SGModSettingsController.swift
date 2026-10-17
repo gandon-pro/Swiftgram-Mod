@@ -9,17 +9,19 @@ import SGItemListUI
 import SGSimpleSettings
 
 private enum SGModSection: Int32, SGItemListSection {
+    case pseudoPro
     case privacy
     case deleted
     case camera
 }
 
 private enum SGModToggle: Hashable {
-    case ghost, deleted, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions
+    case pseudoPro, ghost, deleted, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions
 }
 
 private enum SGModLink: Hashable {
     case archive
+    case pseudoPro
 }
 
 private typealias SGModEntry = SGItemListUIEntry<SGModSection, SGModToggle, String, String, SGModLink, String>
@@ -30,6 +32,8 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
     var archiveLimitInput = String(SGPrivacySettings.deletedMessagesLimit)
     let arguments = SGItemListArguments<SGModToggle, String, String, SGModLink, String>(context: context, setBoolValue: { setting, value in
         switch setting {
+        case .pseudoPro:
+            SGPrivacySettings.swiftpseudoPro = value
         case .ghost:
             SGPrivacySettings.ghostMode = value
         case .online:
@@ -60,8 +64,14 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
             }
         }
         changed.set(true)
-    }, openDisclosureLink: { _ in
-        pushImpl?(sgDeletedMessagesController(context: context))
+    }, openDisclosureLink: { link in
+        switch link {
+        case .archive:
+            pushImpl?(sgDeletedMessagesController(context: context))
+        case .pseudoPro:
+            guard SGPrivacySettings.swiftpseudoPro else { return }
+            pushImpl?(context.sharedContext.makeSGProController(context: context))
+        }
     }, action: { action in
         if action == "saveArchiveLimit", let limit = Int(archiveLimitInput), (1 ... 10000).contains(limit) {
             SGPrivacySettings.deletedMessagesLimit = limit
@@ -79,6 +89,12 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         let ru = data.strings.baseLanguageCode.hasPrefix("ru")
         let counter = SGItemListCounter()
         var entries: [SGModEntry] = []
+        entries.append(.header(id: counter.count, section: .pseudoPro, text: "Swiftpseudo-Pro", badge: nil))
+        entries.append(.toggle(id: counter.count, section: .pseudoPro, settingName: .pseudoPro, value: SGPrivacySettings.swiftpseudoPro, text: "Swiftpseudo-Pro", enabled: true))
+        if SGPrivacySettings.swiftpseudoPro {
+            entries.append(.disclosure(id: counter.count, section: .pseudoPro, link: .pseudoPro, text: ru ? "Настройки Swiftpseudo-Pro" : "Swiftpseudo-Pro settings"))
+        }
+        entries.append(.notice(id: counter.count, section: .pseudoPro, text: ru ? "Открывает локальные функции клиента: фильтр сообщений, панель форматирования, резервные копии сеансов и оформление. Настоящую подписку Swiftgram Pro или Telegram Premium не оформляет. После изменения заново откройте чат для обновления панели." : "Enables local client features: message filtering, formatting toolbar, session backups and appearance. Does not purchase Swiftgram Pro or Telegram Premium. Reopen the chat after switching to refresh its toolbar."))
         entries.append(.header(id: counter.count, section: .privacy, text: ru ? "Приватность" : "Privacy", badge: nil))
         entries.append(.toggle(id: counter.count, section: .privacy, settingName: .ghost, value: SGPrivacySettings.ghostMode, text: ru ? "Режим призрака" : "Ghost mode", enabled: true))
         entries.append(.toggle(id: counter.count, section: .privacy, settingName: .online, value: SGPrivacySettings.ghostHideOnline, text: ru ? "Скрывать онлайн" : "Hide online status", enabled: true))

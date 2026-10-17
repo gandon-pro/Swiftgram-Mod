@@ -5,20 +5,30 @@ import SwiftSignalKit
 import SGSimpleSettings
 
 private func niggagramStatusBadge() -> UIImage? {
-    let size = CGSize(width: 136.0, height: 25.0)
+    // Match the stock @3x badge (279 x 66 pixels). A wider badge overlaps
+    // the compact Dynamic Island on iPhone 14 Pro / Pro Max.
+    let size = CGSize(width: 93.0, height: 22.0)
     UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
     defer { UIGraphicsEndImageContext() }
     UIColor(red: 0.49, green: 0.22, blue: 0.82, alpha: 1.0).setFill()
     UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: size.height / 2).fill()
     if let portrait = UIImage(bundleImageName: "ModPrivacy") {
-        let rect = CGRect(x: 2, y: 2, width: 21, height: 21)
+        let rect = CGRect(x: 2, y: 2, width: 18, height: 18)
         UIGraphicsGetCurrentContext()?.saveGState()
         UIBezierPath(ovalIn: rect).addClip()
         portrait.draw(in: rect)
         UIGraphicsGetCurrentContext()?.restoreGState()
     }
     let text = "NIGGAGRAM" as NSString
-    text.draw(at: CGPoint(x: 28, y: 5), withAttributes: [.font: UIFont.boldSystemFont(ofSize: 12), .foregroundColor: UIColor.white])
+    let availableWidth = size.width - 24.0 - 4.0
+    var font = UIFont.systemFont(ofSize: 11.0, weight: .semibold)
+    let measuredWidth = text.size(withAttributes: [.font: font]).width
+    if measuredWidth > availableWidth {
+        font = font.withSize(font.pointSize * availableWidth / measuredWidth)
+    }
+    let textSize = text.size(withAttributes: [.font: font])
+    let textRect = CGRect(x: 24.0 + (availableWidth - textSize.width) / 2.0, y: (size.height - textSize.height) / 2.0, width: textSize.width, height: textSize.height)
+    text.draw(in: textRect, withAttributes: [.font: font, .foregroundColor: UIColor.white])
     return UIGraphicsGetImageFromCurrentImageContext()
 }
 
