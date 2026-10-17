@@ -7,6 +7,8 @@ from pathlib import Path, PurePosixPath
 
 BUNDLE_ID = "ph.nigga.graph"
 APP_NAME = "Niggagram"
+CUSTOM_ICONS = ("NGCustom1", "NGCustom2", "NGCustom3")
+ICON_DIRECTORY = Path(__file__).resolve().parent / "app-icons"
 
 
 def brand(source: Path, destination: Path):
@@ -38,6 +40,14 @@ def brand(source: Path, destination: Path):
                     if info.filename == main:
                         plist["CFBundleDisplayName"] = APP_NAME
                         plist["CFBundleName"] = APP_NAME
+                        for key in ("CFBundleIcons", "CFBundleIcons~ipad"):
+                            icons = plist.setdefault(key, {})
+                            alternatives = icons.setdefault("CFBundleAlternateIcons", {})
+                            for name in CUSTOM_ICONS:
+                                files = [name + "-60"]
+                                if key.endswith("~ipad"):
+                                    files += [name + "-76", name + "-83.5"]
+                                alternatives[name] = {"CFBundleIconFiles": files, "UIPrerenderedIcon": True}
                     data = plistlib.dumps(plist, fmt=plistlib.FMT_BINARY)
                 elif info.filename.startswith(app_root) and info.filename.endswith(".lproj/InfoPlist.strings"):
                     try:
@@ -53,6 +63,12 @@ def brand(source: Path, destination: Path):
                                 plist[key] = APP_NAME
                         data = plistlib.dumps(plist, fmt=plistlib.FMT_BINARY)
                 output.writestr(info, data)
+            # Loose alternate PNG icons are embedded before the user re-signs
+            # the IPA. Preserve the compiled primary icon and existing variants.
+            for name in CUSTOM_ICONS:
+                for suffix in ("60@2x", "60@3x", "76", "76@2x", "83.5@2x"):
+                    filename = name + "-" + suffix + ".png"
+                    output.write(ICON_DIRECTORY / filename, app_root + filename)
     with zipfile.ZipFile(destination) as archive:
         assert archive.testzip() is None
         plist = plistlib.loads(archive.read(main))

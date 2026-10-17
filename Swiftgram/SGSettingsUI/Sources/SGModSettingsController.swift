@@ -9,6 +9,7 @@ import SGItemListUI
 import SGSimpleSettings
 
 private enum SGModSection: Int32, SGItemListSection {
+    case appearance
     case pseudoPro
     case privacy
     case deleted
@@ -22,6 +23,7 @@ private enum SGModToggle: Hashable {
 private enum SGModLink: Hashable {
     case archive
     case pseudoPro
+    case icons
 }
 
 private typealias SGModEntry = SGItemListUIEntry<SGModSection, SGModToggle, String, String, SGModLink, String>
@@ -71,6 +73,8 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         case .pseudoPro:
             guard SGPrivacySettings.swiftpseudoPro else { return }
             pushImpl?(context.sharedContext.makeSGProController(context: context))
+        case .icons:
+            pushImpl?(sgModIconsController(context: context))
         }
     }, action: { action in
         if action == "saveArchiveLimit", let limit = Int(archiveLimitInput), (1 ... 10000).contains(limit) {
@@ -89,6 +93,8 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         let ru = data.strings.baseLanguageCode.hasPrefix("ru")
         let counter = SGItemListCounter()
         var entries: [SGModEntry] = []
+        entries.append(.header(id: counter.count, section: .appearance, text: ru ? "Оформление" : "Appearance", badge: nil))
+        entries.append(.disclosure(id: counter.count, section: .appearance, link: .icons, text: ru ? "Иконка приложения" : "App icon"))
         entries.append(.header(id: counter.count, section: .pseudoPro, text: "Swiftpseudo-Pro", badge: nil))
         entries.append(.toggle(id: counter.count, section: .pseudoPro, settingName: .pseudoPro, value: SGPrivacySettings.swiftpseudoPro, text: "Swiftpseudo-Pro", enabled: true))
         if SGPrivacySettings.swiftpseudoPro {

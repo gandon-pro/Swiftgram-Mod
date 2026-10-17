@@ -60,6 +60,9 @@ jobs:
           xcrun swiftc -warnings-as-errors submodules/ICloudResources/Sources/ICloudFileAccess.swift mod-tools/tests/ICloudFileAccessTests.swift -o "$RUNNER_TEMP/sg-file-access-tests"
           "$RUNNER_TEMP/sg-file-access-tests"
 
+      - name: Test alternate app icon packaging
+        run: python3 mod-tools/tests/test_app_icons.py
+
       - name: Install the Metal compiler component
         if: inputs.mode == 'ipa'
         run: xcodebuild -downloadComponent MetalToolchain
