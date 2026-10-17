@@ -1,4 +1,5 @@
 import Foundation
+import SGSimpleSettings
 import Postbox
 import SwiftSignalKit
 import TelegramApi
@@ -119,6 +120,9 @@ func managedSynchronizeViewStoriesOperations(postbox: Postbox, network: Network,
 }
 
 private func pushStoriesAreSeen(postbox: Postbox, network: Network, stateManager: AccountStateManager, peer: Peer, operation: SynchronizeViewStoriesOperation) -> Signal<Void, NoError> {
+    if SGPrivacySettings.hideStoryViews {
+        return .complete()
+    }
     guard let inputPeer = apiInputPeer(peer) else {
         return .complete()
     }

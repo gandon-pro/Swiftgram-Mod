@@ -143,12 +143,16 @@ private func actionFromActivity(_ activity: PeerInputActivity?) -> Api.SendMessa
 }
 
 private func requestActivity(postbox: Postbox, network: Network, accountPeerId: PeerId, peerId: PeerId, threadId: Int64?, activity: PeerInputActivity?) -> Signal<Void, NoError> {
-    if SGPrivacySettings.hideTyping, let activity = activity {
-        // Speaking indicators are needed for calls; nil still sends a typing cancellation.
+    if let activity = activity {
+        let privacyActivity: SGPrivateActivity
         switch activity {
-        case .speakingInGroupCall:
-            break
-        default:
+        case .typingText: privacyActivity = .typing
+        case .recordingVoice, .recordingInstantVideo: privacyActivity = .recording
+        case .uploadingFile, .uploadingPhoto, .uploadingVideo, .uploadingInstantVideo: privacyActivity = .uploading
+        case .speakingInGroupCall: privacyActivity = .call
+        case .playingGame, .choosingSticker, .interactingWithEmoji, .seeingEmojiInteraction: privacyActivity = .interaction
+        }
+        if SGPrivacySettings.suppressActivity(privacyActivity) {
             return .complete()
         }
     }

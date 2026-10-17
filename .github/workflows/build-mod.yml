@@ -52,6 +52,14 @@ jobs:
           xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGAppStorage.swift mod-tools/tests/SGAppStorageTests.swift -o "$RUNNER_TEMP/sg-app-storage-tests"
           "$RUNNER_TEMP/sg-app-storage-tests"
 
+      - name: Test ghost controls and local document access
+        run: |
+          set -euo pipefail
+          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift mod-tools/tests/SGPrivacySettingsTests.swift -o "$RUNNER_TEMP/sg-privacy-tests"
+          "$RUNNER_TEMP/sg-privacy-tests"
+          xcrun swiftc -warnings-as-errors submodules/ICloudResources/Sources/ICloudFileAccess.swift mod-tools/tests/ICloudFileAccessTests.swift -o "$RUNNER_TEMP/sg-file-access-tests"
+          "$RUNNER_TEMP/sg-file-access-tests"
+
       - name: Install the Metal compiler component
         if: inputs.mode == 'ipa'
         run: xcodebuild -downloadComponent MetalToolchain

@@ -4,6 +4,24 @@ import AsyncDisplayKit
 import SwiftSignalKit
 import SGSimpleSettings
 
+private func niggagramStatusBadge() -> UIImage? {
+    let size = CGSize(width: 136.0, height: 25.0)
+    UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
+    defer { UIGraphicsEndImageContext() }
+    UIColor(red: 0.97, green: 0.31, blue: 0.14, alpha: 1.0).setFill()
+    UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: size.height / 2).fill()
+    if let portrait = UIImage(bundleImageName: "ModPrivacy") {
+        let rect = CGRect(x: 2, y: 2, width: 21, height: 21)
+        UIGraphicsGetCurrentContext()?.saveGState()
+        UIBezierPath(ovalIn: rect).addClip()
+        portrait.draw(in: rect)
+        UIGraphicsGetCurrentContext()?.restoreGState()
+    }
+    let text = "NIGGAGRAM" as NSString
+    text.draw(at: CGPoint(x: 28, y: 5), withAttributes: [.font: UIFont.boldSystemFont(ofSize: 12), .foregroundColor: UIColor.white])
+    return UIGraphicsGetImageFromCurrentImageContext()
+}
+
 private struct WindowLayout: Equatable {
     let size: CGSize
     let metrics: LayoutMetrics
@@ -349,11 +367,7 @@ public class Window1 {
     public init(hostView: WindowHostView, statusBarHost: StatusBarHost?) {
         self.hostView = hostView
         self.badgeView = UIImageView()
-        if SGSimpleSettings.shared.status > 1, let image = UIImage(bundleImageName: SGSimpleSettings.shared.customAppBadge) {
-            self.badgeView.image = image
-        } else {
-        self.badgeView.image = UIImage(bundleImageName: "Components/AppBadge")
-        }
+        self.badgeView.image = niggagramStatusBadge()
         self.badgeView.isHidden = true
         
         self.systemUserInterfaceStyle = hostView.systemUserInterfaceStyle

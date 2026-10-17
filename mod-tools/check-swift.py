@@ -4,6 +4,17 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 paths = [
+    "submodules/Display/Source/WindowContent.swift",
+    "submodules/Camera/Sources/Camera.swift",
+    "submodules/Camera/Sources/CameraDevice.swift",
+    "submodules/Camera/Sources/CameraOutput.swift",
+    "submodules/ICloudResources/Sources/ICloudFileAccess.swift",
+    "submodules/ICloudResources/Sources/ICloudResources.swift",
+    "submodules/TelegramUI/Sources/ChatControllerOpenAttachmentMenu.swift",
+    "submodules/TelegramCore/Sources/State/ManagedSynchronizeViewStoriesOperations.swift",
+    "submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift",
+    "mod-tools/tests/SGPrivacySettingsTests.swift",
+    "mod-tools/tests/ICloudFileAccessTests.swift",
     "Swiftgram/SGSimpleSettings/Sources/SGAppStorage.swift",
     "submodules/TelegramUI/Sources/AppDelegate.swift",
     "mod-tools/tests/SGAppStorageTests.swift",

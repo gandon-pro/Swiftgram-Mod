@@ -112,7 +112,13 @@ final class CameraDevice {
             
             if !candidates.isEmpty {
                 var bestFormat: AVCaptureDevice.Format?
+                if maxFramerate > 30 {
+                    bestFormat = candidates.last(where: { format in
+                        format.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= maxFramerate && $0.maxFrameRate >= maxFramerate })
+                    })
+                }
     photoOuter: for format in photoCandidates {
+                    if maxFramerate > 30 && bestFormat != nil { break }
                     for range in format.videoSupportedFrameRateRanges {
                         if range.maxFrameRate > maxFramerate {
                             continue photoOuter

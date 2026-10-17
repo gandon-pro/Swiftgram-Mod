@@ -72,7 +72,7 @@ func sgArchiveDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [Me
         guard id.namespace == Namespaces.Message.Cloud,
               id.peerId.namespace == Namespaces.Peer.CloudUser || id.peerId.namespace == Namespaces.Peer.CloudGroup || id.peerId.namespace == Namespaces.Peer.CloudChannel,
               let message = transaction.getMessage(id),
-              message.flags.contains(.Incoming), !message.text.isEmpty else {
+              !message.text.isEmpty || message.media.contains(where: { $0 is TelegramMediaImage || $0 is TelegramMediaFile }) else {
             continue
         }
         // Secret chats, scheduled messages, disappearing and view-once content are excluded.
@@ -83,8 +83,10 @@ func sgArchiveDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [Me
         if !message.attributes.contains(where: { $0 is SGDeletedMessageAttribute }) {
             transaction.updateMessage(id, update: { current in
                 let attributes: [MessageAttribute] = current.attributes.filter { $0 is TextEntitiesMessageAttribute } + [SGDeletedMessageAttribute(deletedAt: deletedAt)]
-                // Retain a bounded text-only bubble, without media or live actions.
-                return .update(StoreMessage(id: current.id, customStableId: nil, globallyUniqueId: current.globallyUniqueId, groupingKey: nil, threadId: current.threadId, timestamp: current.timestamp, flags: StoreMessageFlags(current.flags), tags: [], globalTags: [], localTags: [], forwardInfo: nil, authorId: current.author?.id, text: String(current.text.prefix(4096)), attributes: attributes, media: []))
+                // Keep ordinary media references so already cached content remains
+                // available. Never retain disappearing or view-once messages.
+                let media = current.media.filter { $0 is TelegramMediaImage || $0 is TelegramMediaFile }
+                return .update(StoreMessage(id: current.id, customStableId: nil, globallyUniqueId: current.globallyUniqueId, groupingKey: nil, threadId: current.threadId, timestamp: current.timestamp, flags: StoreMessageFlags(current.flags), tags: [], globalTags: [], localTags: [], forwardInfo: nil, authorId: current.author?.id, text: String(current.text.prefix(4096)), attributes: attributes, media: media))
             })
         }
         if !archive.contains(where: { $0.peerId == id.peerId.toInt64() && $0.messageId == id.id }) {
@@ -92,7 +94,7 @@ func sgArchiveDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [Me
             peerId: id.peerId.toInt64(), messageId: id.id,
             chatTitle: sgArchivePeerTitle(transaction.getPeer(id.peerId)),
             author: sgArchivePeerTitle(message.author),
-            text: String(message.text.prefix(4096)), timestamp: message.timestamp,
+            text: message.text.isEmpty ? "[Media / Медиа]" : String(message.text.prefix(4096)), timestamp: message.timestamp,
                 deletedAt: deletedAt
             ))
             changed = true

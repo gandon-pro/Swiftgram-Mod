@@ -1729,6 +1729,7 @@ plist_fragment(
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
         <string>{telegram_bundle_id}.refresh</string>
+        <string>{telegram_bundle_id}.deletedMessagesRefresh</string>
         <string>{telegram_bundle_id}.cleanup</string>
         <string>{telegram_bundle_id}.upload.*</string>
     </array>
