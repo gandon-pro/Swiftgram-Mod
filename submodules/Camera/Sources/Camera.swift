@@ -88,6 +88,11 @@ final class CameraDeviceContext {
     
     private func maxDimensions(additional: Bool, preferWide: Bool) -> CMVideoDimensions {
         if self.isRoundVideo && self.exclusive {
+            if SGPrivacySettings.videoNotes60FPS {
+                // VGA formats on recent iPhones may stop at 30 FPS. Capture HD
+                // and let CameraOutput crop/scale to the video-message size.
+                return CMVideoDimensions(width: 1920, height: 1080)
+            }
             return CMVideoDimensions(width: 640, height: 480)
         } else {
             if additional || preferWide {
@@ -1153,6 +1158,11 @@ public final class Camera {
     }
     
     public static func isDualCameraSupported(forRoundVideo: Bool = false) -> Bool {
+        if forRoundVideo && SGPrivacySettings.videoNotes60FPS {
+            // The round-video screen otherwise enables MultiCam automatically,
+            // forcing the non-exclusive 30 FPS path even with a single preview.
+            return false
+        }
         if #available(iOS 13.0, *), AVCaptureMultiCamSession.isMultiCamSupported && !DeviceModel.current.isIpad {
             if forRoundVideo && (ProcessInfo.processInfo.isLowPowerModeEnabled || DeviceModel.current == .iPhoneXR) {
                 return false

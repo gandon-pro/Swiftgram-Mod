@@ -16,6 +16,11 @@ extension AVFrameRateRange {
 
 extension AVCaptureDevice {
     func actualFPS(_ fps: Double) -> (fps: Double, duration: CMTime)? {
+        // Search all supported ranges before falling back to a clamped rate.
+        // Returning a clamp from the first range can incorrectly turn 60 into 30.
+        if self.activeFormat.videoSupportedFrameRateRanges.contains(where: { $0.contains(rate: fps) }) {
+            return (fps, CMTimeMake(value: 100, timescale: Int32(100 * fps)))
+        }
         var durations: [CMTime] = []
         var frameRates: [Double] = []
         

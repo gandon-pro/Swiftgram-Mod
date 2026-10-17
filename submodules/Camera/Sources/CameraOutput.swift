@@ -486,6 +486,8 @@ final class CameraOutput: NSObject {
     private weak var masterOutput: CameraOutput?
     
     private var lastSampleTimestamp: CMTime?
+    private var frameRateWindowStart: Double?
+    private var frameRateWindowCount = 0
     
     private func roundVideoFormatDescription(for sourceFormatDescription: CMFormatDescription) -> CMFormatDescription? {
         if let entry = self.roundVideoFormatDescriptionCache.first(where: { CFEqual($0.sourceFormatDescription, sourceFormatDescription) }) {
@@ -700,6 +702,21 @@ extension CameraOutput: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureA
         }
         
         if let videoPixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+            if self.isVideoMessage && SGPrivacySettings.videoNotes60FPS {
+                let timestamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds
+                if let start = self.frameRateWindowStart, timestamp >= start {
+                    self.frameRateWindowCount += 1
+                    if timestamp - start >= 5.0 {
+                        let fps = Double(self.frameRateWindowCount) / (timestamp - start)
+                        Logger.shared.log("CameraFPS", "Video message capture: \(fps) FPS, camera: \(self.currentPosition)")
+                        self.frameRateWindowStart = timestamp
+                        self.frameRateWindowCount = 0
+                    }
+                } else if timestamp.isFinite {
+                    self.frameRateWindowStart = timestamp
+                    self.frameRateWindowCount = 0
+                }
+            }
             self.processSampleBuffer?(sampleBuffer, videoPixelBuffer, connection)
         } else if sampleBuffer.type == kCMMediaType_Audio {
             self.processAudioBuffer?(sampleBuffer)

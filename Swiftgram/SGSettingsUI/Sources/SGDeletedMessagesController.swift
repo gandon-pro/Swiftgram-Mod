@@ -1,4 +1,5 @@
 import Foundation
+import SGSimpleSettings
 import Postbox
 import PresentationDataUtils
 import Display
@@ -41,7 +42,7 @@ func sgDeletedMessagesController(context: AccountContext) -> ViewController {
         let messages = view.values[sgDeletedMessagesKey]?.get(SGDeletedMessages.self)?.messages ?? []
         let counter = SGItemListCounter()
         var entries: [SGArchiveEntry] = []
-        entries.append(.header(id: counter.count, section: .actions, text: ru ? "Локальный архив · \(messages.count)/200" : "Local archive · \(messages.count)/200", badge: nil))
+        entries.append(.header(id: counter.count, section: .actions, text: ru ? "Локальный архив · \(messages.count)/\(SGPrivacySettings.deletedMessagesLimit)" : "Local archive · \(messages.count)/\(SGPrivacySettings.deletedMessagesLimit)", badge: nil))
         entries.append(.action(id: counter.count, section: .actions, actionType: .clear, text: ru ? "Очистить архив" : "Clear archive", kind: .destructive))
         if messages.isEmpty {
             entries.append(.notice(id: counter.count, section: .messages, text: ru ? "Пока нет сохранённых сообщений. Включите удалённые сообщения в разделе Nigga. Восстановить сообщения, которые этот клиент не получал, нельзя." : "No saved messages yet. Enable deleted messages in Nigga settings. Messages this client never received cannot be recovered."))

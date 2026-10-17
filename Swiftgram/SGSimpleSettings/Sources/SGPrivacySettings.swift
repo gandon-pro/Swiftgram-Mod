@@ -6,6 +6,7 @@ public enum SGPrivateActivity {
 
 public enum SGPrivacySettings {
     public static let changed = Notification.Name("Swiftgram.LocalPrivacySettingsChanged")
+    public static let messageSent = Notification.Name("Niggagram.MessageSent")
 
     private static func preference(_ key: String, defaultValue: Bool = true) -> Bool {
         return UserDefaults.standard.object(forKey: key) as? Bool ?? defaultValue
@@ -52,6 +53,21 @@ public enum SGPrivacySettings {
         set { set(newValue, for: "sg.mod.hideInteractions") }
     }
     public static var hideOnline: Bool { ghostMode && ghostHideOnline }
+    public static var ghostHideOnlineAfterSend: Bool {
+        get { preference("sg.mod.hideOnlineAfterSend") }
+        set { set(newValue, for: "sg.mod.hideOnlineAfterSend") }
+    }
+    public static var hideOnlineAfterSend: Bool { ghostMode && ghostHideOnlineAfterSend }
+    public static var deletedMessagesLimit: Int {
+        get {
+            guard let value = UserDefaults.standard.object(forKey: "sg.mod.deletedMessagesLimit") as? Int else { return 200 }
+            return min(10000, max(1, value))
+        }
+        set {
+            UserDefaults.standard.set(min(10000, max(1, newValue)), forKey: "sg.mod.deletedMessagesLimit")
+            NotificationCenter.default.post(name: changed, object: nil)
+        }
+    }
     public static var hideTyping: Bool { ghostMode && ghostHideTyping }
     public static var hideReadReceipts: Bool { ghostMode && ghostHideReadReceipts }
     public static var hideStoryViews: Bool { ghostMode && ghostHideStories }

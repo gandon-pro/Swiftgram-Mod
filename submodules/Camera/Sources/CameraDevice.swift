@@ -78,6 +78,9 @@ final class CameraDevice {
                 }
                 
                 let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+                if maxFramerate > 30 && !format.videoSupportedFrameRateRanges.contains(where: { $0.minFrameRate <= maxFramerate && $0.maxFrameRate >= maxFramerate }) {
+                    continue
+                }
                 if dimensions.width >= maxWidth && dimensions.width <= maxDimensions.width && dimensions.height >= maxHeight && dimensions.height <= maxDimensions.height {
                     if dimensions.width > maxWidth {
                         hasSecondaryZoomLevels = false
@@ -86,7 +89,7 @@ final class CameraDevice {
                     let subtype = CMFormatDescriptionGetMediaSubType(format.formatDescription)
                     if subtype == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange {
                         for range in format.videoSupportedFrameRateRanges {
-                            if range.maxFrameRate > 60 {
+                            if maxFramerate <= 30 && range.maxFrameRate > 60 {
                                 continue outer
                             }
                         }
@@ -155,12 +158,13 @@ final class CameraDevice {
             #endif
             
             if let targetFPS = device.actualFPS(maxFramerate) {
+                self.fps = targetFPS.fps
                 device.activeVideoMinFrameDuration = targetFPS.duration
                 device.activeVideoMaxFrameDuration = targetFPS.duration
             }
             
             if device.isLowLightBoostSupported {
-                device.automaticallyEnablesLowLightBoostWhenAvailable = true
+                device.automaticallyEnablesLowLightBoostWhenAvailable = maxFramerate <= 30
             }
                         
             if device.isExposureModeSupported(.continuousAutoExposure) {

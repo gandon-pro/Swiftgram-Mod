@@ -75,8 +75,11 @@ func sgArchiveDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [Me
               !message.text.isEmpty || message.media.contains(where: { $0 is TelegramMediaImage || $0 is TelegramMediaFile }) else {
             continue
         }
-        // Secret chats, scheduled messages, disappearing and view-once content are excluded.
-        if message.attributes.contains(where: { $0 is AutoremoveTimeoutMessageAttribute || $0 is AutoclearTimeoutMessageAttribute }) {
+        // Ordinary cloud-chat auto-delete uses Autoremove. Autoclear is
+        // self-destructing media; keep that and view-once outside this archive.
+        if message.attributes.contains(where: { attribute in
+            attribute is AutoclearTimeoutMessageAttribute || (attribute as? AutoremoveTimeoutMessageAttribute)?.timeout == viewOnceTimeout
+        }) {
             continue
         }
         let deletedAt = Int64(Date().timeIntervalSince1970)
@@ -84,7 +87,7 @@ func sgArchiveDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [Me
             transaction.updateMessage(id, update: { current in
                 let attributes: [MessageAttribute] = current.attributes.filter { $0 is TextEntitiesMessageAttribute } + [SGDeletedMessageAttribute(deletedAt: deletedAt)]
                 // Keep ordinary media references so already cached content remains
-                // available. Never retain disappearing or view-once messages.
+                // available. Never retain view-once or secret-chat media.
                 let media = current.media.filter { $0 is TelegramMediaImage || $0 is TelegramMediaFile }
                 return .update(StoreMessage(id: current.id, customStableId: nil, globallyUniqueId: current.globallyUniqueId, groupingKey: nil, threadId: current.threadId, timestamp: current.timestamp, flags: StoreMessageFlags(current.flags), tags: [], globalTags: [], localTags: [], forwardInfo: nil, authorId: current.author?.id, text: String(current.text.prefix(4096)), attributes: attributes, media: media))
             })
@@ -100,12 +103,12 @@ func sgArchiveDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [Me
             changed = true
         }
     }
-    // Bound both row count and text storage; media are never copied into the archive.
-    var textBytes = archive.reduce(0) { $0 + $1.text.utf8.count }
-    while archive.count > 200 || textBytes > 512 * 1024 {
+    // Each row has at most 4096 characters; the user-selected row limit also
+    // bounds text storage without an unrelated 512 KB cap truncating it early.
+    while archive.count > SGPrivacySettings.deletedMessagesLimit {
         let expired = archive.removeFirst()
-        textBytes -= expired.text.utf8.count
         sgRemoveRetainedRows(transaction: transaction, messages: [expired])
+        changed = true
     }
     if changed {
         transaction.updatePreferencesEntry(key: sgDeletedMessagesKey, { _ in
@@ -114,6 +117,17 @@ func sgArchiveDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [Me
     }
     return ids.filter { id in
         transaction.getMessage(id)?.attributes.contains(where: { $0 is SGDeletedMessageAttribute }) != true
+    }
+}
+
+public func sgTrimDeletedMessages(postbox: Postbox) -> Signal<Void, NoError> {
+    return postbox.transaction { transaction -> Void in
+        var messages = transaction.getPreferencesEntry(key: sgDeletedMessagesKey)?.get(SGDeletedMessages.self)?.messages ?? []
+        let overflow = max(0, messages.count - SGPrivacySettings.deletedMessagesLimit)
+        guard overflow > 0 else { return }
+        sgRemoveRetainedRows(transaction: transaction, messages: Array(messages.prefix(overflow)))
+        messages.removeFirst(overflow)
+        transaction.updatePreferencesEntry(key: sgDeletedMessagesKey, { _ in PreferencesEntry(SGDeletedMessages(messages: messages)) })
     }
 }
 

@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import UIKit
 import Postbox
 import SSignalKit
@@ -10,6 +11,22 @@ import LocalMediaResources
 import LegacyMediaPickerUI
 import MediaEditor
 import Photos
+
+private func videoMessageExportFrameRate(values: MediaEditorValues, asset: AVAsset?) -> Float {
+    switch values.qualityPreset {
+    case .some(.videoMessage), .some(.videoMessageHD):
+        // Preserve captured frames when trimming/re-encoding a video message.
+        // A hardcoded 30 here used to discard half of a 60 FPS recording.
+        let rates = asset?.tracks(withMediaType: .video).map { track -> Float in
+            if track.nominalFrameRate > 0 { return track.nominalFrameRate }
+            let duration = track.minFrameDuration.seconds
+            return duration.isFinite && duration > 0 ? Float(1.0 / duration) : 30
+        } ?? []
+        return min(60, max(30, rates.max() ?? 30))
+    default:
+        return 30
+    }
+}
 
 private final class AVURLAssetCopyItem: MediaResourceDataFetchCopyLocalItem {
     private let url: URL
@@ -347,7 +364,7 @@ public func fetchVideoLibraryMediaResource(postbox: Postbox, resource: VideoLibr
                     let updatedSize = Atomic<Int64>(value: 0)
                     if let mediaEditorValues {
                         let duration: Double = avAsset.duration.seconds
-                        let configuration = recommendedVideoExportConfiguration(values: mediaEditorValues, duration: duration, frameRate: 30.0)
+                        let configuration = recommendedVideoExportConfiguration(values: mediaEditorValues, duration: duration, frameRate: videoMessageExportFrameRate(values: mediaEditorValues, asset: avAsset))
                         let videoExport = MediaEditorVideoExport(postbox: postbox, subject: .video(asset: avAsset, isStory: isStory), configuration: configuration, outputPath: tempFile.path)
                         
                         let statusDisposable = videoExport.status.start(next: { status in
@@ -551,7 +568,7 @@ public func fetchLocalFileVideoMediaResource(postbox: Postbox, resource: LocalFi
                 return EmptyDisposable
             }
             
-            let configuration = recommendedVideoExportConfiguration(values: mediaEditorValues, duration: duration, frameRate: 30.0)
+            let configuration = recommendedVideoExportConfiguration(values: mediaEditorValues, duration: duration, frameRate: videoMessageExportFrameRate(values: mediaEditorValues, asset: avAsset))
             let videoExport = MediaEditorVideoExport(postbox: postbox, subject: subject, configuration: configuration, outputPath: tempFile.path)
             
             let statusDisposable = videoExport.status.start(next: { status in

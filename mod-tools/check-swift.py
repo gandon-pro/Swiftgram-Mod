@@ -4,6 +4,10 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 paths = [
+    "submodules/Camera/Sources/CameraUtils.swift",
+    "submodules/TelegramCore/Sources/State/PendingMessageManager.swift",
+    "submodules/TelegramCore/Sources/State/ManagedAutoremoveMessageOperations.swift",
+    "submodules/TelegramUI/Components/Resources/FetchVideoMediaResource/Sources/FetchVideoMediaResource.swift",
     "submodules/Display/Source/WindowContent.swift",
     "submodules/Camera/Sources/Camera.swift",
     "submodules/Camera/Sources/CameraDevice.swift",

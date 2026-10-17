@@ -4,7 +4,7 @@ import Foundation
 struct SGPrivacySettingsTests {
     static func main() {
         let defaults = UserDefaults.standard
-        let keys = ["ghostEnabled", "hideOnline", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
+        let keys = ["ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
         let old = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, old) {
@@ -13,10 +13,24 @@ struct SGPrivacySettingsTests {
         }
         for key in keys { defaults.removeObject(forKey: key) }
         precondition(!SGPrivacySettings.ghostMode)
+        precondition(SGPrivacySettings.deletedMessagesLimit == 200)
+        SGPrivacySettings.deletedMessagesLimit = 3500
+        precondition(SGPrivacySettings.deletedMessagesLimit == 3500)
+        precondition(defaults.integer(forKey: "sg.mod.deletedMessagesLimit") == 3500)
+        SGPrivacySettings.deletedMessagesLimit = 0
+        precondition(SGPrivacySettings.deletedMessagesLimit == 1)
+        SGPrivacySettings.deletedMessagesLimit = Int.max
+        precondition(SGPrivacySettings.deletedMessagesLimit == 10000)
+        defaults.set(-5, forKey: "sg.mod.deletedMessagesLimit")
+        precondition(SGPrivacySettings.deletedMessagesLimit == 1)
+        precondition(!SGPrivacySettings.hideOnlineAfterSend)
         SGPrivacySettings.ghostHideTyping = false
         SGPrivacySettings.ghostHideUploads = true
         precondition(!SGPrivacySettings.ghostMode, "Editing a selection must not enable the master")
         SGPrivacySettings.ghostMode = true
+        precondition(SGPrivacySettings.hideOnlineAfterSend)
+        SGPrivacySettings.ghostHideOnlineAfterSend = false
+        precondition(!SGPrivacySettings.hideOnlineAfterSend && SGPrivacySettings.hideOnline)
         precondition(!SGPrivacySettings.suppressActivity(.typing))
         precondition(SGPrivacySettings.suppressActivity(.uploading))
         precondition(SGPrivacySettings.suppressActivity(.recording))

@@ -8,7 +8,7 @@ private func niggagramStatusBadge() -> UIImage? {
     let size = CGSize(width: 136.0, height: 25.0)
     UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
     defer { UIGraphicsEndImageContext() }
-    UIColor(red: 0.97, green: 0.31, blue: 0.14, alpha: 1.0).setFill()
+    UIColor(red: 0.49, green: 0.22, blue: 0.82, alpha: 1.0).setFill()
     UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: size.height / 2).fill()
     if let portrait = UIImage(bundleImageName: "ModPrivacy") {
         let rect = CGRect(x: 2, y: 2, width: 21, height: 21)
