@@ -9,6 +9,17 @@ public enum SGPrivacySettings {
         NotificationCenter.default.post(name: changed, object: nil)
     }
 
+    public static var ghostMode: Bool {
+        get { hideOnline && hideTyping && hideReadReceipts }
+        set {
+            // Write the complete bundle before notifying the networking queues.
+            for key in ["sg.mod.hideOnline", "sg.mod.hideTyping", "sg.mod.hideReadReceipts"] {
+                UserDefaults.standard.set(newValue, forKey: key)
+            }
+            NotificationCenter.default.post(name: changed, object: nil)
+        }
+    }
+
     public static var hideOnline: Bool {
         get { UserDefaults.standard.bool(forKey: "sg.mod.hideOnline") }
         set { set(newValue, for: "sg.mod.hideOnline") }

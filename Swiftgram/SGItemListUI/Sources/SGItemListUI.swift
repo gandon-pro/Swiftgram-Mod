@@ -194,7 +194,8 @@ public enum SGItemListUIEntry<Section: SGItemListSection, BoolSetting: Hashable,
         case let .notice(_, _, string):
             return ItemListTextItem(presentationData: presentationData, text: .markdown(string), sectionId: self.section)
         case let .plainNotice(_, _, string):
-            return ItemListTextItem(presentationData: presentationData, text: .plain(string), sectionId: self.section)
+            let text = NSAttributedString(string: string, font: Font.regular(13.0), textColor: presentationData.theme.list.freeTextColor.withAlphaComponent(0.5))
+            return ItemListTextItem(presentationData: presentationData, text: .custom(context: arguments.context, string: text), sectionId: self.section)
         case let .disclosure(_, _, link, text):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", sectionId: self.section, style: .blocks) {
                 arguments.openDisclosureLink(link)

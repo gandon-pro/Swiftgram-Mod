@@ -3983,6 +3983,8 @@ public class ChatMessageBubbleItemNode: ChatMessageItemView, ChatMessagePreviewI
         }
         
         strongSelf.currentInputParams = inputParams
+        // Always reset on reuse so ordinary bubbles remain fully opaque.
+        strongSelf.mainContainerNode.alpha = item.message.attributes.contains(where: { $0 is SGDeletedMessageAttribute }) ? 0.5 : 1.0
         strongSelf.currentApplyParams = applyInfo
         strongSelf.contentLayoutInsets = layoutInsets
         

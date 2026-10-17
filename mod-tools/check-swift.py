@@ -4,6 +4,14 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 paths = [
+    "Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift",
+    "submodules/TelegramCore/Sources/Account/AccountManager.swift",
+    "submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift",
+    "submodules/TelegramPresentationData/Sources/Resources/PresentationResourcesSettings.swift",
+    "submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreen.swift",
+    "submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoScreenSettingsActions.swift",
+    "submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoSettingsItems.swift",
+    "submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode/Sources/ChatMessageBubbleItemNode.swift",
     "Swiftgram/SGItemListUI/Sources/SGItemListUI.swift",
     "Swiftgram/SGSettingsUI/Sources/SGDeletedMessagesController.swift",
     "Swiftgram/SGSettingsUI/Sources/SGSettingsController.swift",
@@ -24,4 +32,4 @@ paths = [
 for path in paths:
     subprocess.run(["xcrun", "swiftc", "-frontend", "-parse", str(root / path)], check=True, cwd=root)
     print("Parsed:", path)
-print("All 16 Swift files parsed. Type checking and an IPA build are separate steps.")
+print(f"All {len(paths)} Swift files parsed. Type checking and an IPA build are separate steps.")

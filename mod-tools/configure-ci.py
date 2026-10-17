@@ -35,4 +35,4 @@ if __name__ == "__main__":
                   os.environ.get("TELEGRAM_API_HASH", "").strip())
     except ValueError as error:
         raise SystemExit(str(error))
-    print("Build configuration created; API credentials are not included in the artifact.")
+    print("Build configuration created without printing API credentials.")

@@ -83,6 +83,7 @@ jobs:
         if: inputs.mode == 'ipa'
         run: |
           set -euo pipefail
+          python3 mod-tools/prepare-mod-icon.py
           python3 -u build-system/Make/Make.py \
             --bazel="$BAZEL_PATH" \
             --cacheDir="$RUNNER_TEMP/swiftgram-bazel-cache" \
@@ -98,16 +99,16 @@ jobs:
           set -euo pipefail
           mkdir -p build/mod-artifacts
           test -s bazel-bin/Telegram/Swiftgram.ipa
-          cp bazel-bin/Telegram/Swiftgram.ipa build/mod-artifacts/Swiftgram-Mod-resign-required.ipa
+          python3 mod-tools/brand-ipa.py bazel-bin/Telegram/Swiftgram.ipa build/mod-artifacts/Niggagram-resign-required.ipa
           python3 - <<'PY'
           import hashlib, json, os
           from pathlib import Path
           root = Path('build/mod-artifacts')
-          ipa = root / 'Swiftgram-Mod-resign-required.ipa'
+          ipa = root / 'Niggagram-resign-required.ipa'
           info = {'commit': os.environ['GITHUB_SHA'], 'run': os.environ['GITHUB_RUN_ID'],
                   'sha256': hashlib.sha256(ipa.read_bytes()).hexdigest(),
                   'signing': 'Upstream test identity. Re-sign with your own Apple ID before installing.',
-                  'tested_on_device': False}
+                  'tested_on_device': False, 'bundle_id': 'ph.nigga.graph', 'display_name': 'Niggagram'}
           (root / 'build-info.json').write_text(json.dumps(info, indent=2))
           (root / 'INSTALL.txt').write_text('This IPA uses an upstream test signature. It must be re-signed before installation. Use a signing tool on Windows such as AltStore Classic. A successful CI build does not verify behavior on iPhone.\n')
           PY
@@ -116,7 +117,7 @@ jobs:
         if: inputs.mode == 'ipa'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: Swiftgram-Mod-IPA-${{ github.run_number }}
+          name: Niggagram-IPA-${{ github.run_number }}
           path: build/mod-artifacts/
           if-no-files-found: error
           retention-days: 7

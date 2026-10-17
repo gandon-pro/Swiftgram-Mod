@@ -27,7 +27,7 @@ func sgDeletedMessagesController(context: AccountContext) -> ViewController {
         case .clear:
             let data = context.sharedContext.currentPresentationData.with { $0 }
             let ru = data.strings.baseLanguageCode.hasPrefix("ru")
-            presentImpl?(textAlertController(context: context, title: ru ? "Очистить архив?" : "Clear archive?", text: ru ? "Сохранённый текст будет удалён из архива этого аккаунта." : "Saved text will be removed from this account's archive.", actions: [
+            presentImpl?(textAlertController(context: context, title: ru ? "Очистить архив?" : "Clear archive?", text: ru ? "Сохранённый текст удалится из архива и полупрозрачных сообщений в чатах этого аккаунта." : "Saved text and translucent retained bubbles will be removed from this account.", actions: [
                 TextAlertAction(type: .genericAction, title: data.strings.Common_Cancel, action: {}),
                 TextAlertAction(type: .destructiveAction, title: data.strings.Common_Delete, action: {
                     let _ = sgClearDeletedMessages(postbox: context.account.postbox).start()
@@ -44,7 +44,7 @@ func sgDeletedMessagesController(context: AccountContext) -> ViewController {
         entries.append(.header(id: counter.count, section: .actions, text: ru ? "Локальный архив · \(messages.count)/200" : "Local archive · \(messages.count)/200", badge: nil))
         entries.append(.action(id: counter.count, section: .actions, actionType: .clear, text: ru ? "Очистить архив" : "Clear archive", kind: .destructive))
         if messages.isEmpty {
-            entries.append(.notice(id: counter.count, section: .messages, text: ru ? "Пока нет сохранённых сообщений. Включите сохранение в настройках Swiftgram. Восстановить сообщения, которые этот клиент не получал, нельзя." : "No saved messages yet. Enable retention in Swiftgram settings. Messages this client never received cannot be recovered."))
+            entries.append(.notice(id: counter.count, section: .messages, text: ru ? "Пока нет сохранённых сообщений. Включите удалённые сообщения в разделе Nigga. Восстановить сообщения, которые этот клиент не получал, нельзя." : "No saved messages yet. Enable deleted messages in Nigga settings. Messages this client never received cannot be recovered."))
         } else {
             let formatter = DateFormatter()
             formatter.locale = Locale(identifier: data.strings.baseLanguageCode)

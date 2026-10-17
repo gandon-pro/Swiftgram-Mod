@@ -17,6 +17,7 @@ enum SettingsSection: Int, CaseIterable {
     case edit
     case phone
     case accounts
+    case modPrivacy
     case myProfile
     case proxy
     case swiftgram
@@ -220,14 +221,19 @@ func settingsItems(showProfileId: Bool, data: PeerInfoScreenData?, context: Acco
     }
     
     
+    items[.swiftgram]!.append(PeerInfoScreenDisclosureItem(id: 1, label: swiftgramLabel, text: "Swiftgram", icon: PresentationResourcesSettings.swiftgram, action: {
+        interaction.openSettings(.swiftgram)
+    }))
+
     let sgWebSettings = context.currentAppConfiguration.with({ $0 }).sgWebSettings
     if sgWebSettings.global.paymentsEnabled || context.sharedContext.immediateSGStatus.status > 1 {
         items[.swiftgram]!.append(PeerInfoScreenDisclosureItem(id: 0, label: swiftgramProLabel, text: "Swiftgram Pro", icon: PresentationResourcesSettings.swiftgramPro, action: {
             interaction.openSettings(.swiftgramPro)
         }))
     }
-    items[.swiftgram]!.append(PeerInfoScreenDisclosureItem(id: 1, label: swiftgramLabel, text: "Swiftgram", icon: PresentationResourcesSettings.swiftgram, action: {
-        interaction.openSettings(.swiftgram)
+
+    items[.modPrivacy]!.append(PeerInfoScreenDisclosureItem(id: 0, text: "Nigga", icon: PresentationResourcesSettings.modPrivacy, action: {
+        interaction.openSettings(.modPrivacy)
     }))
 
     var appIndex = 1000
@@ -388,7 +394,9 @@ func settingsItems(showProfileId: Bool, data: PeerInfoScreenData?, context: Acco
     }))
     
     var result: [(AnyHashable, [PeerInfoScreenItem])] = []
-    for section in SettingsSection.allCases {
+    // Keep the mod directly after Swiftgram / Pro and before My Profile.
+    let sectionOrder: [SettingsSection] = [.edit, .phone, .accounts, .swiftgram, .modPrivacy, .myProfile, .proxy, .swiftgramPro, .apps, .shortcuts, .advanced, .payment, .extra, .support]
+    for section in sectionOrder {
         if let sectionItems = items[section], !sectionItems.isEmpty {
             result.append((section, sectionItems))
         }

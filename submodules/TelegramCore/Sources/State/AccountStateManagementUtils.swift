@@ -4440,7 +4440,10 @@ func replayFinalState(
                     }
                 }
             case let .DeleteMessagesWithGlobalIds(ids):
-                sgArchiveDeletedMessages(transaction: transaction, ids: transaction.messageIdsForGlobalIds(ids))
+                let resolvedIds = transaction.messageIdsForGlobalIds(ids)
+                let deletableIds = Set(sgArchiveDeletedMessages(transaction: transaction, ids: resolvedIds))
+                let retainedGlobalIds = Set(resolvedIds.filter { !deletableIds.contains($0) }.map { $0.id })
+                let ids = ids.filter { !retainedGlobalIds.contains($0) }
                 var resourceIds: [MediaResourceId] = []
                 transaction.deleteMessagesWithGlobalIds(ids, forEachMedia: { media in
                     addMessageMediaResourceIdsToRemove(media: media, resourceIds: &resourceIds)
@@ -4450,7 +4453,7 @@ func replayFinalState(
                 }
                 deletedMessageIds.append(contentsOf: ids.map { .global($0) })
             case let .DeleteMessages(ids):
-                sgArchiveDeletedMessages(transaction: transaction, ids: ids)
+                let ids = sgArchiveDeletedMessages(transaction: transaction, ids: ids)
                 _internal_deleteMessages(transaction: transaction, mediaBox: mediaBox, ids: ids, manualAddMessageThreadStatsDifference: { id, add, remove in
                     addMessageThreadStatsDifference(threadKey: id, remove: remove, addedMessagePeer: nil, addedMessageId: nil, isOutgoing: false)
                 })
