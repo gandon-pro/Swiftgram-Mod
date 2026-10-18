@@ -46,6 +46,9 @@ jobs:
       - name: Parse changed Swift sources using the real Swift compiler
         run: python3 mod-tools/check-swift.py
 
+      - name: Validate presentation string references
+        run: python3 mod-tools/tests/test_presentation_strings.py
+
       - name: Test storage initialization without App Groups entitlement
         run: |
           set -euo pipefail

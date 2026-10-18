@@ -588,7 +588,7 @@ public func themeSettingsController(context: AccountContext, focusOnItemTag: The
                 ]
                 let alert: ViewController = PresentationDataUtils.textAlertController(
                     context: context,
-                    title: data.strings.Common_Error,
+                    title: nil,
                     text: message,
                     actions: actions
                 )
