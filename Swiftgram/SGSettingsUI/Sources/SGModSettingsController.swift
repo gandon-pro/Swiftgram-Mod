@@ -14,6 +14,7 @@ private enum SGModSection: Int32, SGItemListSection {
     case privacy
     case deleted
     case camera
+    case voice
 }
 
 private enum SGModToggle: Hashable {
@@ -31,6 +32,7 @@ private typealias SGModEntry = SGItemListUIEntry<SGModSection, SGModToggle, Stri
 public func sgModSettingsController(context: AccountContext) -> ViewController {
     let changed = ValuePromise(true, ignoreRepeated: false)
     var pushImpl: ((ViewController) -> Void)?
+    var presentImpl: ((ViewController, ViewControllerPresentationArguments?) -> Void)?
     var archiveLimitInput = String(SGPrivacySettings.deletedMessagesLimit)
     let arguments = SGItemListArguments<SGModToggle, String, String, SGModLink, String>(context: context, setBoolValue: { setting, value in
         switch setting {
@@ -66,6 +68,24 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
             }
         }
         changed.set(true)
+    }, setOneFromManyValue: { setting in
+        guard setting == "voiceEffect" else { return }
+        let data = context.sharedContext.currentPresentationData.with { $0 }
+        let ru = data.strings.baseLanguageCode.hasPrefix("ru")
+        let sheet = ActionSheetController(presentationData: data)
+        let items: [ActionSheetItem] = SGVoiceEffect.allCases.map { effect in
+            ActionSheetButtonItem(title: effect.title(russian: ru), color: .accent, action: { [weak sheet] in
+                sheet?.dismissAnimated()
+                SGPrivacySettings.voiceEffect = effect
+                changed.set(true)
+            })
+        }
+        sheet.setItemGroups([ActionSheetItemGroup(items: items), ActionSheetItemGroup(items: [
+            ActionSheetButtonItem(title: data.strings.Common_Cancel, color: .accent, font: .bold, action: { [weak sheet] in
+                sheet?.dismissAnimated()
+            })
+        ])])
+        presentImpl?(sheet, ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
     }, openDisclosureLink: { link in
         switch link {
         case .archive:
@@ -124,12 +144,18 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Удалённые сообщения остаются в чате с прозрачностью 50%: до \(SGPrivacySettings.deletedMessagesLimit) записей, включая обычное автоудаление в облачных чатах. Сохраняются текст и ссылки на обычные медиа; не загруженные файлы могут быть недоступны. Секретные чаты, одноразовые и самоуничтожающиеся медиа исключены. Выключение убирает сохранённые сообщения из чата; архив очищается отдельно." : "Deleted messages remain at 50% opacity: up to \(SGPrivacySettings.deletedMessagesLimit) entries, including ordinary cloud-chat auto-delete. Keeps text and ordinary media references; files not downloaded may be unavailable. Secret chats, view-once and self-destructing media are excluded. Switching off removes retained chat messages; clear the archive separately."))
         entries.append(.toggle(id: counter.count, section: .camera, settingName: .video60, value: SGPrivacySettings.videoNotes60FPS, text: ru ? "Кружки: 60 FPS" : "Video messages: 60 FPS", enabled: true))
         entries.append(.notice(id: counter.count, section: .camera, text: ru ? "Выключено — стандартные 30 FPS. В режиме 60 FPS используется одна камера: фронтальная или задняя, с переключением при записи. Камера должна поддерживать формат 60 FPS. Изменение применяется при следующем открытии записи кружка." : "Off uses the default 30 FPS. 60 FPS uses one camera at a time, front or back, with switching while recording. A supported 60 FPS camera format is required. Changes apply the next time video-message recording opens."))
+        entries.append(.header(id: counter.count, section: .voice, text: ru ? "Голосовые сообщения" : "Voice messages", badge: nil))
+        entries.append(.oneFromManySelector(id: counter.count, section: .voice, settingName: "voiceEffect", text: ru ? "Войсченджер" : "Voice changer", value: SGPrivacySettings.voiceEffect.title(russian: ru), enabled: true))
+        entries.append(.notice(id: counter.count, section: .voice, text: ru ? "Эффект применяется к новым голосовым сообщениям и слышен в предпрослушивании перед отправкой. Выберите «Без эффекта», чтобы выключить. Уже записанные фрагменты, кружки и звонки не меняются." : "Applies to new voice recordings and is audible in the preview before sending. Select Off to disable. Existing recorded segments, video messages and calls are unchanged."))
         let state = ItemListControllerState(presentationData: ItemListPresentationData(data), title: .text("Nigga"), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: data.strings.Common_Back))
         return (state, (ItemListNodeState(presentationData: ItemListPresentationData(data), entries: entries, style: .blocks, ensureVisibleItemTag: nil), arguments))
     }
     let controller = ItemListController(context: context, state: signal)
     pushImpl = { [weak controller] next in
         (controller?.navigationController as? NavigationController)?.pushViewController(next)
+    }
+    presentImpl = { [weak controller] next, arguments in
+        controller?.present(next, in: .window(.root), with: arguments)
     }
     return controller
 }

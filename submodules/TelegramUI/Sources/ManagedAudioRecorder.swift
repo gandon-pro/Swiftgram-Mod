@@ -6,6 +6,7 @@ import TelegramCore
 import TelegramAudio
 import UniversalMediaPlayer
 import AccountContext
+import SGSimpleSettings
 import OpusBinding
 import ChatPresentationInterfaceState
 import AudioWaveform
@@ -162,6 +163,9 @@ final class ManagedAudioRecorderContext {
     private var oggWriter: TGOggOpusWriter
     private var dataItem: TGDataItem
     private var audioBuffer = Data()
+    // Snapshot once: settings changes must not change an active recording mid-sentence.
+    private let voiceChanger = SGVoiceChanger(effect: SGPrivacySettings.voiceEffect, sampleRate: 48000)
+
     
     private let audioUnit = Atomic<AudioUnit?>(value: nil)
     
@@ -579,6 +583,10 @@ final class ManagedAudioRecorderContext {
             return
         }
         
+        if let samples = buffer.mData?.assumingMemoryBound(to: Int16.self) {
+            self.voiceChanger.process(samples, count: Int(buffer.mDataByteSize) / MemoryLayout<Int16>.size)
+        }
+
         let millisecondsPerPacket = 60
         let encoderPacketSizeInBytes = 16000 / 1000 * millisecondsPerPacket * 2
         

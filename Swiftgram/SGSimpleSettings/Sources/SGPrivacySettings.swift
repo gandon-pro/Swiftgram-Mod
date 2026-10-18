@@ -21,6 +21,14 @@ public enum SGPrivacySettings {
         return reportedName
     }
 
+    public static var voiceEffect: SGVoiceEffect {
+        get { SGVoiceEffect(rawValue: UserDefaults.standard.string(forKey: "sg.mod.voiceEffect") ?? "") ?? .off }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: "sg.mod.voiceEffect")
+            NotificationCenter.default.post(name: changed, object: nil)
+        }
+    }
+
     public static var swiftpseudoPro: Bool {
         get { preference("sg.mod.swiftpseudoPro", defaultValue: false) }
         set { set(newValue, for: "sg.mod.swiftpseudoPro") }

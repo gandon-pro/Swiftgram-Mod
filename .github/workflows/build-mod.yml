@@ -55,10 +55,16 @@ jobs:
       - name: Test ghost controls and local document access
         run: |
           set -euo pipefail
-          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift mod-tools/tests/SGPrivacySettingsTests.swift -o "$RUNNER_TEMP/sg-privacy-tests"
+          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift mod-tools/tests/SGPrivacySettingsTests.swift -o "$RUNNER_TEMP/sg-privacy-tests"
           "$RUNNER_TEMP/sg-privacy-tests"
           xcrun swiftc -warnings-as-errors submodules/ICloudResources/Sources/ICloudFileAccess.swift mod-tools/tests/ICloudFileAccessTests.swift -o "$RUNNER_TEMP/sg-file-access-tests"
           "$RUNNER_TEMP/sg-file-access-tests"
+
+      - name: Test streaming voice effects
+        run: |
+          set -euo pipefail
+          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift mod-tools/tests/SGVoiceChangerTests.swift -o "$RUNNER_TEMP/sg-voice-tests"
+          "$RUNNER_TEMP/sg-voice-tests"
 
       - name: Test alternate app icon packaging
         run: python3 mod-tools/tests/test_app_icons.py
