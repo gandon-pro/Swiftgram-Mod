@@ -7,6 +7,19 @@ public enum SGPrivateActivity {
 public enum SGPrivacySettings {
     public static let changed = Notification.Name("Swiftgram.LocalPrivacySettingsChanged")
     public static let messageSent = Notification.Name("Niggagram.MessageSent")
+    public static var selectedAppIconName: String? {
+        get {
+            let value = UserDefaults.standard.string(forKey: "sg.mod.selectedAppIconName") ?? ""
+            return value.isEmpty ? nil : value
+        }
+        set { UserDefaults.standard.set(newValue ?? "", forKey: "sg.mod.selectedAppIconName") }
+    }
+    public static func currentAppIconName(reportedName: String?) -> String? {
+        if UserDefaults.standard.object(forKey: "sg.mod.selectedAppIconName") != nil {
+            return selectedAppIconName
+        }
+        return reportedName
+    }
 
     public static var swiftpseudoPro: Bool {
         get { preference("sg.mod.swiftpseudoPro", defaultValue: false) }

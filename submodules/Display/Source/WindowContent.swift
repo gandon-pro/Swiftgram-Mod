@@ -4,7 +4,7 @@ import AsyncDisplayKit
 import SwiftSignalKit
 import SGSimpleSettings
 
-private func niggagramStatusBadge() -> UIImage? {
+public func niggagramAppBadgeImage() -> UIImage? {
     // Match the stock @3x badge (279 x 66 pixels). A wider badge overlaps
     // the compact Dynamic Island on iPhone 14 Pro / Pro Max.
     let size = CGSize(width: 93.0, height: 22.0)
@@ -377,7 +377,12 @@ public class Window1 {
     public init(hostView: WindowHostView, statusBarHost: StatusBarHost?) {
         self.hostView = hostView
         self.badgeView = UIImageView()
-        self.badgeView.image = niggagramStatusBadge()
+        let savedBadge = SGSimpleSettings.shared.customAppBadge
+        if !savedBadge.isEmpty && savedBadge != "NiggagramAppBadge", let image = UIImage(bundleImageName: savedBadge) {
+            self.badgeView.image = image
+        } else {
+            self.badgeView.image = niggagramAppBadgeImage()
+        }
         self.badgeView.isHidden = true
         
         self.systemUserInterfaceStyle = hostView.systemUserInterfaceStyle

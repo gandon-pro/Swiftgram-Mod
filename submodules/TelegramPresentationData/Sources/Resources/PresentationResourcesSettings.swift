@@ -117,7 +117,14 @@ let colorGray = UIColor(rgb: 0x8E8E93)
 let colorViolet = UIColor(rgb: 0x5E5CE6)
 
 public struct PresentationResourcesSettings {
-    public static let swiftgram = renderSettingsIcon(name: "SwiftgramSettings", scaleFactor: 30.0 / 512.0)
+    public static let swiftgram: UIImage? = {
+        guard let image = UIImage(bundleImageName: "SwiftgramSettings") ?? UIImage(bundleImageName: "SwiftgramPro") else { return nil }
+        // Draw through UIKit so vector PDF-backed images need no cgImage.
+        UIGraphicsBeginImageContextWithOptions(CGSize(width: 30, height: 30), false, 0)
+        defer { UIGraphicsEndImageContext() }
+        image.draw(in: CGRect(x: 0, y: 0, width: 30, height: 30))
+        return UIGraphicsGetImageFromCurrentImageContext()
+    }()
     public static let modPrivacy: UIImage? = {
         guard let image = UIImage(bundleImageName: "ModPrivacy") else { return nil }
         UIGraphicsBeginImageContextWithOptions(CGSize(width: 30.0, height: 30.0), false, 0.0)

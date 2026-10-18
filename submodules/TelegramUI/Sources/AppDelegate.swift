@@ -1042,12 +1042,15 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             }
         }, getAlternateIconName: {
             if #available(iOS 10.3, *) {
-                return application.alternateIconName
+                return SGPrivacySettings.currentAppIconName(reportedName: application.alternateIconName)
             } else {
                 return nil
             }
         }, requestSetAlternateIconName: { name, completion in
             application.setAlternateIconName(name, completionHandler: { error in
+                if error == nil {
+                    SGPrivacySettings.selectedAppIconName = name
+                }
                 if let error = error {
                    Logger.shared.log("App \(self.episodeId)", "failed to set alternate icon with error \(error.localizedDescription)")
                 }

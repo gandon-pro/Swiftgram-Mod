@@ -10,13 +10,14 @@ import AccountContext
 
 
 struct AppBadge: Identifiable, Hashable {
-    let id: UUID = .init()
+    var id: String { assetName }
     let displayName: String
     let assetName: String
 }
 
 func getAvailableAppBadges() -> [AppBadge] {
     var appBadges: [AppBadge] = [
+        .init(displayName: "Niggagram", assetName: "NiggagramAppBadge"),
         .init(displayName: "Default", assetName: "Components/AppBadge"),
         .init(displayName: "Sky", assetName: "SkyAppBadge"),
         .init(displayName: "Night", assetName: "NightAppBadge"),
@@ -25,7 +26,7 @@ func getAvailableAppBadges() -> [AppBadge] {
         .init(displayName: "Day", assetName: "DayAppBadge"),
     ]
 
-    if SGSimpleSettings.shared.duckyAppIconAvailable {
+    if SGSimpleSettings.shared.duckyAppIconAvailable || SGPrivacySettings.swiftpseudoPro {
         appBadges.append(.init(displayName: "Ducky", assetName: "DuckyAppBadge"))
     }
     appBadges += [
@@ -72,11 +73,11 @@ struct AppBadgeSettingsView: View {
     }
     
     private func onSelectBadge(_ badge: AppBadge) {
-        self.selectedBadge = badge
-        let image = UIImage(bundleImageName: selectedBadge.assetName) ?? UIImage(bundleImageName: "Components/AppBadge")
         if SGPrivacySettings.allowsLocalPro(status: self.context.sharedContext.immediateSGStatus.status) {
+            let image = badge.assetName == "NiggagramAppBadge" ? niggagramAppBadgeImage() : UIImage(bundleImageName: badge.assetName)
             DispatchQueue.main.async {
-                SGSimpleSettings.shared.customAppBadge = selectedBadge.assetName
+                self.selectedBadge = badge
+                SGSimpleSettings.shared.customAppBadge = badge.assetName
                 self.context.sharedContext.mainWindow?.badgeView.image = image
             }
         }
@@ -90,7 +91,7 @@ struct AppBadgeSettingsView: View {
                         onSelectBadge(badge)
                     } label: {
                         VStack(spacing: 8) {
-                            Image(badge.assetName)
+                            Image(uiImage: (badge.assetName == "NiggagramAppBadge" ? niggagramAppBadgeImage() : UIImage(bundleImageName: badge.assetName)) ?? UIImage())
                                 .resizable()
                                 .scaledToFit()
                                 .frame(height: Layout.imageHeight)

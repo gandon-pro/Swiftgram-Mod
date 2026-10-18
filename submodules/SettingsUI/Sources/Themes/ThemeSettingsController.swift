@@ -1,4 +1,5 @@
 import Foundation
+import SGSimpleSettings
 import UIKit
 import AsyncDisplayKit
 import Display
@@ -634,15 +635,22 @@ public func themeSettingsController(context: AccountContext, focusOnItemTag: The
                 }
                 pushControllerImpl?(controller)
             // MARK: Swiftgram
-            } else if icon.isSGPro && context.sharedContext.immediateSGStatus.status < 2 {
+            } else if icon.isSGPro && !SGPrivacySettings.allowsLocalPro(status: context.sharedContext.immediateSGStatus.status) {
                 if let payWallController = context.sharedContext.makeSGPayWallController(context: context) {
                     presentControllerImpl?(payWallController, ViewControllerPresentationArguments(presentationAnimation: .modalSheet))
                 } else {
                     presentControllerImpl?(context.sharedContext.makeSGUpdateIOSController(), nil)
                 }
             } else {
-                currentAppIconName.set(icon.name)
-                context.sharedContext.applicationBindings.requestSetAlternateIconName(icon.isDefault ? nil : icon.name, { _ in
+                context.sharedContext.applicationBindings.requestSetAlternateIconName(icon.isDefault ? nil : icon.name, { success in
+                    Queue.mainQueue().async {
+                        if success {
+                            currentAppIconName.set(icon.name)
+                        } else {
+                            let data = context.sharedContext.currentPresentationData.with { $0 }
+                            presentControllerImpl?(textAlertController(context: context, title: data.strings.Common_Error, text: data.strings.baseLanguageCode.hasPrefix("ru") ? "iOS не удалось сменить иконку. Выбор не сохранён." : "iOS could not change the icon. The selection was not saved.", actions: [TextAlertAction(type: .defaultAction, title: data.strings.Common_OK, action: {})]), nil)
+                        }
+                    }
                 })
             }
         })
@@ -1123,7 +1131,7 @@ public func themeSettingsController(context: AccountContext, focusOnItemTag: The
         
         // MARK: Swiftgram
         let sgStatus = sharedData.entries[ApplicationSpecificSharedDataKeys.sgStatus]?.get(SGStatus.self) ?? SGStatus.default
-        let isPremium = sgStatus.status > 1
+        let isPremium = SGPrivacySettings.allowsLocalPro(status: sgStatus.status)
         
         let themeReference: PresentationThemeReference
         if presentationData.autoNightModeTriggered {

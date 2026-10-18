@@ -4,7 +4,7 @@ import Foundation
 struct SGPrivacySettingsTests {
     static func main() {
         let defaults = UserDefaults.standard
-        let keys = ["swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
+        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
         let old = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, old) {
@@ -12,6 +12,14 @@ struct SGPrivacySettingsTests {
             }
         }
         for key in keys { defaults.removeObject(forKey: key) }
+        precondition(SGPrivacySettings.currentAppIconName(reportedName: "SGSky") == "SGSky")
+        SGPrivacySettings.selectedAppIconName = "NGCustom2"
+        precondition(SGPrivacySettings.currentAppIconName(reportedName: nil) == "NGCustom2", "Keep the successful selection if UIKit still reports the old name")
+        precondition(defaults.string(forKey: "sg.mod.selectedAppIconName") == "NGCustom2")
+        SGPrivacySettings.selectedAppIconName = nil
+        precondition(SGPrivacySettings.currentAppIconName(reportedName: "NGCustom2") == nil, "An explicit default selection must override a stale alternate name")
+        SGPrivacySettings.selectedAppIconName = "SGPro"
+        precondition(SGPrivacySettings.currentAppIconName(reportedName: "NGCustom2") == "SGPro", "Stock and mod pickers share selection state")
         precondition(!SGPrivacySettings.swiftpseudoPro)
         precondition(!SGPrivacySettings.allowsLocalPro(status: 1))
         precondition(SGPrivacySettings.allowsLocalPro(status: 2))

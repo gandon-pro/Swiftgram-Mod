@@ -4,6 +4,7 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 paths = [
+    "submodules/SettingsUI/Sources/Themes/ThemeSettingsController.swift",
     "Swiftgram/SGSettingsUI/Sources/SGModIconsController.swift",
     "Swiftgram/SGProUI/Sources/SGProUI.swift",
     "Swiftgram/SGProUI/Sources/AppBadgeSelectorController.swift",
