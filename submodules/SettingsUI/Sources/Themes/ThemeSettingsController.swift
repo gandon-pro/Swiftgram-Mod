@@ -570,7 +570,34 @@ public func themeSettingsController(context: AccountContext, focusOnItemTag: The
         return animatedEmojiStickers
     }
     
-    let arguments = ThemeSettingsControllerArguments(context: context, selectTheme: { theme in
+    // Keep the asynchronous icon completion outside the large settings-arguments
+    // expression. Explicit types avoid cascading Swift inference failures here.
+    let applyAppIcon: (PresentationAppIcon) -> Void = { icon in
+        context.sharedContext.applicationBindings.requestSetAlternateIconName(icon.isDefault ? nil : icon.name, { (success: Bool) -> Void in
+            Queue.mainQueue().async { () -> Void in
+                if success {
+                    currentAppIconName.set(icon.name)
+                    return
+                }
+                let data: PresentationData = context.sharedContext.currentPresentationData.with { $0 }
+                let message: String = data.strings.baseLanguageCode.hasPrefix("ru")
+                    ? "iOS не удалось сменить иконку. Выбор не сохранён."
+                    : "iOS could not change the icon. The selection was not saved."
+                let actions: [TextAlertAction] = [
+                    TextAlertAction(type: .defaultAction, title: data.strings.Common_OK, action: {})
+                ]
+                let alert: ViewController = PresentationDataUtils.textAlertController(
+                    context: context,
+                    title: data.strings.Common_Error,
+                    text: message,
+                    actions: actions
+                )
+                presentControllerImpl?(alert, nil)
+            }
+        })
+    }
+
+    let arguments: ThemeSettingsControllerArguments = ThemeSettingsControllerArguments(context: context, selectTheme: { theme in
         selectThemeImpl?(theme)
     }, openThemeSettings: {
         pushControllerImpl?(themePickerController(context: context))
@@ -642,16 +669,7 @@ public func themeSettingsController(context: AccountContext, focusOnItemTag: The
                     presentControllerImpl?(context.sharedContext.makeSGUpdateIOSController(), nil)
                 }
             } else {
-                context.sharedContext.applicationBindings.requestSetAlternateIconName(icon.isDefault ? nil : icon.name, { success in
-                    Queue.mainQueue().async {
-                        if success {
-                            currentAppIconName.set(icon.name)
-                        } else {
-                            let data = context.sharedContext.currentPresentationData.with { $0 }
-                            presentControllerImpl?(textAlertController(context: context, title: data.strings.Common_Error, text: data.strings.baseLanguageCode.hasPrefix("ru") ? "iOS не удалось сменить иконку. Выбор не сохранён." : "iOS could not change the icon. The selection was not saved.", actions: [TextAlertAction(type: .defaultAction, title: data.strings.Common_OK, action: {})]), nil)
-                        }
-                    }
-                })
+                applyAppIcon(icon)
             }
         })
     }, editTheme: { theme in
@@ -1106,7 +1124,7 @@ public func themeSettingsController(context: AccountContext, focusOnItemTag: The
         })
     })
 
-    let signal = combineLatest(
+    let signal: Signal<(ItemListControllerState, (ItemListNodeState, Any)), NoError> = combineLatest(
         queue: .mainQueue(),
         context.sharedContext.presentationData,
         context.sharedContext.accountManager.sharedData(keys: [
