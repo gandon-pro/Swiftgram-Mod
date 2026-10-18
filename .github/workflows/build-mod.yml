@@ -49,6 +49,12 @@ jobs:
       - name: Validate presentation string references
         run: python3 mod-tools/tests/test_presentation_strings.py
 
+      - name: Test re-signed push notification environments
+        run: |
+          set -euo pipefail
+          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGPushEnvironment.swift mod-tools/tests/SGPushEnvironmentTests.swift -o "$RUNNER_TEMP/sg-push-tests"
+          "$RUNNER_TEMP/sg-push-tests"
+
       - name: Test storage initialization without App Groups entitlement
         run: |
           set -euo pipefail

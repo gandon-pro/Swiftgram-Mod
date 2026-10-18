@@ -111,3 +111,25 @@ py -3.13 mod-tools/validate-syntax.py
 - Скрытие индикатора отправки не скрывает сам отправленный файл от получателя.
 
 Проверка на настоящем iPhone и измерение FPS остаются обязательной ручной проверкой.
+
+
+## Push notifications after re-signing
+
+The APNs environment now follows `aps-environment` from the embedded signing
+profile instead of assuming that every release IPA uses production APNs.
+The same environment is used for account device registration, login push
+configuration and app-token metadata. If no profile can be read, the upstream
+Debug/Release fallback is retained. This does not grant a missing entitlement.
+
+To diagnose an ESign installation, inspect the **signed** app, not the unsigned
+build artifact: the profile and code signature must authorize Push Notifications
+for the installed bundle ID (`ph.nigga.graph`). ESign must retain that capability.
+The app must also have notification permission in iOS Settings. Telegram's push
+provider must support the app's APNs identity; a device token alone cannot
+configure that provider. Do not copy another app's credentials.
+
+If `didFailToRegisterForRemoteNotificationsWithError` appears in the device log,
+resolve the reported signing/network error first. Successful device registration
+does not by itself prove end-to-end delivery. Test with a second account while
+the phone is locked. Without working push delivery, background archive updates
+are limited to the execution windows iOS actually grants the client.

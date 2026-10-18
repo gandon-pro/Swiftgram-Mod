@@ -4,6 +4,9 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 paths = [
+    "Swiftgram/SGSimpleSettings/Sources/SGPushEnvironment.swift",
+    "mod-tools/tests/SGPushEnvironmentTests.swift",
+    "submodules/TelegramUI/Sources/SharedAccountContext.swift",
     "Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift",
     "submodules/TelegramUI/Sources/ManagedAudioRecorder.swift",
     "mod-tools/tests/SGVoiceChangerTests.swift",
