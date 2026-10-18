@@ -96,7 +96,22 @@ jobs:
         if: inputs.mode == 'ipa'
         run: python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
 
+      - name: Restore Bazel build cache
+        id: bazel-cache
+        if: inputs.mode == 'ipa'
+        continue-on-error: true
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/swiftgram-bazel-cache
+          # A new snapshot per attempt also retains work from failed builds.
+          # Bazel validates action inputs, so unchanged modules can be reused
+          # across commits without accepting stale output for changed sources.
+          key: bazel-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('versions.json', 'MODULE.bazel.lock') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            bazel-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('versions.json', 'MODULE.bazel.lock') }}-
+
       - name: Compile iPhone IPA
+        id: compile-ipa
         if: inputs.mode == 'ipa'
         run: |
           set -euo pipefail
@@ -152,3 +167,14 @@ jobs:
           for name in ('build-input/mod-ci-configuration.json', 'build-input/configuration-repository/variables.bzl'):
               Path(name).unlink(missing_ok=True)
           PY
+
+      - name: Save Bazel build cache even after a compilation error
+        if: >-
+          always() && !cancelled() && inputs.mode == 'ipa' &&
+          (steps.compile-ipa.outcome == 'success' || steps.compile-ipa.outcome == 'failure') &&
+          steps.bazel-cache.outputs.cache-primary-key != ''
+        continue-on-error: true
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/swiftgram-bazel-cache
+          key: ${{ steps.bazel-cache.outputs.cache-primary-key }}
