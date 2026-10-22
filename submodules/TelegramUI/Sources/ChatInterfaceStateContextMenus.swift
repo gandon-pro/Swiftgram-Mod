@@ -1954,7 +1954,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
         }
 
         if data.messageActions.options.contains(.forward) {
-            if !isCopyProtected {
+            if !isCopyProtected || messages.allSatisfy({ sgCanCopyProtectedMessage($0) }) {
                 actions.append(.action(ContextMenuActionItem(text: chatPresentationInterfaceState.strings.Conversation_ContextMenuForward, icon: { theme in
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Forward"), color: theme.actionSheet.primaryTextColor)
                 }, action: { _, f in
@@ -2911,7 +2911,7 @@ func chatAvailableMessageActionsImpl(engine: TelegramEngine, accountPeerId: Engi
                             }
                         }
                         if !message.containsSecretMedia && !isAction && !isShareProtected {
-                            if message.id.peerId.namespace != Namespaces.Peer.SecretChat && !message.isCopyProtected() {
+                            if message.id.peerId.namespace != Namespaces.Peer.SecretChat && ((!message.isCopyProtected() || sgCanCopyProtectedMessage(message)) || sgCanCopyProtectedMessage(message)) {
                                 if !(message.flags.isSending || message.flags.contains(.Failed)) {
                                     optionsMap[id]!.insert(.forward)
                                 }
@@ -2927,7 +2927,7 @@ func chatAvailableMessageActionsImpl(engine: TelegramEngine, accountPeerId: Engi
                         }
                     } else if let group = peer as? TelegramGroup {
                         if message.id.peerId.namespace != Namespaces.Peer.SecretChat && !message.containsSecretMedia {
-                            if !isAction && !message.isCopyProtected() && !isShareProtected {
+                            if !isAction && ((!message.isCopyProtected() || sgCanCopyProtectedMessage(message)) || sgCanCopyProtectedMessage(message)) && !isShareProtected {
                                 if !(message.flags.isSending || message.flags.contains(.Failed)) {
                                     optionsMap[id]!.insert(.forward)
                                 }
@@ -2946,7 +2946,7 @@ func chatAvailableMessageActionsImpl(engine: TelegramEngine, accountPeerId: Engi
                             optionsMap[id]!.insert(.report)
                         }
                     } else if let user = peer as? TelegramUser {
-                        if !isScheduled && message.id.peerId.namespace != Namespaces.Peer.SecretChat && !message.containsSecretMedia && !isAction && !message.id.peerId.isReplies && !message.isCopyProtected() && !isShareProtected {
+                        if !isScheduled && message.id.peerId.namespace != Namespaces.Peer.SecretChat && !message.containsSecretMedia && !isAction && !message.id.peerId.isReplies && ((!message.isCopyProtected() || sgCanCopyProtectedMessage(message)) || sgCanCopyProtectedMessage(message)) && !isShareProtected {
                             if !(message.flags.isSending || message.flags.contains(.Failed)) {
                                 optionsMap[id]!.insert(.forward)
                             }

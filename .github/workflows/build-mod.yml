@@ -193,3 +193,22 @@ jobs:
         with:
           path: ${{ runner.temp }}/swiftgram-bazel-cache
           key: ${{ steps.bazel-cache.outputs.cache-primary-key }}
+
+      - name: Report build cache reuse
+        if: always() && inputs.mode == 'ipa'
+        env:
+          RESTORED_CACHE: ${{ steps.bazel-cache.outputs.cache-matched-key }}
+          CACHE_PATH: ${{ runner.temp }}/swiftgram-bazel-cache
+        run: |
+          {
+            echo '### Bazel cache'
+            if [[ -n "$RESTORED_CACHE" ]]; then
+              echo "Restored snapshot: \`$RESTORED_CACHE\`"
+            else
+              echo 'No compatible snapshot was restored; this build starts with an empty cache.'
+            fi
+            if [[ -d "$CACHE_PATH" ]]; then
+              echo "Cache size after build: $(du -sh "$CACHE_PATH" | cut -f1)"
+            fi
+            echo 'Each completed compilation attempt saves a new snapshot for subsequent builds.'
+          } >> "$GITHUB_STEP_SUMMARY"

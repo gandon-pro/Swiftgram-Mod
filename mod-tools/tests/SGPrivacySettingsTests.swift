@@ -4,7 +4,7 @@ import Foundation
 struct SGPrivacySettingsTests {
     static func main() {
         let defaults = UserDefaults.standard
-        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
+        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "unlimitedDeletedMessagesArchive", "copyProtectedMessages", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
         let old = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, old) {
@@ -41,6 +41,25 @@ struct SGPrivacySettingsTests {
         precondition(SGPrivacySettings.deletedMessagesLimit == 10000)
         defaults.set(-5, forKey: "sg.mod.deletedMessagesLimit")
         precondition(SGPrivacySettings.deletedMessagesLimit == 1)
+        precondition(!SGPrivacySettings.copyProtectedMessages)
+        SGPrivacySettings.copyProtectedMessages = true
+        precondition(defaults.bool(forKey: "sg.mod.copyProtectedMessages"))
+        SGPrivacySettings.copyProtectedMessages = false
+        precondition(!SGPrivacySettings.unlimitedDeletedMessagesArchive)
+        SGPrivacySettings.deletedMessagesLimit = 3500
+        SGPrivacySettings.unlimitedDeletedMessagesArchive = true
+        precondition(SGPrivacySettings.effectiveDeletedMessagesLimit == nil)
+        precondition(SGPrivacySettings.deletedArchiveOverflow(count: 10001) == 0)
+        precondition(SGPrivacySettings.deletedArchiveOverflow(count: Int.max) == 0)
+        precondition(defaults.bool(forKey: "sg.mod.unlimitedDeletedMessagesArchive"))
+        precondition(SGPrivacySettings.deletedMessagesLimit == 3500)
+        SGPrivacySettings.deletedMessagesLimit = 100
+        precondition(SGPrivacySettings.effectiveDeletedMessagesLimit == nil, "A saved numeric cap cannot trim unlimited retention")
+        SGPrivacySettings.unlimitedDeletedMessagesArchive = false
+        precondition(SGPrivacySettings.effectiveDeletedMessagesLimit == 100, "Disabling unlimited restores the saved cap")
+        precondition(SGPrivacySettings.deletedArchiveOverflow(count: 101) == 1)
+        precondition(SGPrivacySettings.deletedArchiveOverflow(count: 99) == 0)
+        precondition(!SGPrivacySettings.keepDeletedMessages, "Unlimited retention must not enable collection")
         precondition(!SGPrivacySettings.hideOnlineAfterSend)
         SGPrivacySettings.ghostHideTyping = false
         SGPrivacySettings.ghostHideUploads = true

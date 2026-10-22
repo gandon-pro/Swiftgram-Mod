@@ -90,6 +90,34 @@ public enum SGPrivacySettings {
         set { set(newValue, for: "sg.mod.hideOnlineAfterSend") }
     }
     public static var hideOnlineAfterSend: Bool { ghostMode && ghostHideOnlineAfterSend }
+    public static var pastavibeEmojiStatusFileId: Int64? {
+        get { (UserDefaults.standard.object(forKey: "sg.mod.pastavibeEmojiStatusFileId") as? NSNumber)?.int64Value }
+        set {
+            if let value = newValue { UserDefaults.standard.set(NSNumber(value: value), forKey: "sg.mod.pastavibeEmojiStatusFileId") }
+            else { UserDefaults.standard.removeObject(forKey: "sg.mod.pastavibeEmojiStatusFileId") }
+        }
+    }
+
+    public static var copyProtectedMessages: Bool {
+        get { preference("sg.mod.copyProtectedMessages", defaultValue: false) }
+        set { set(newValue, for: "sg.mod.copyProtectedMessages") }
+    }
+
+    public static var unlimitedDeletedMessagesArchive: Bool {
+        get { preference("sg.mod.unlimitedDeletedMessagesArchive", defaultValue: false) }
+        set { set(newValue, for: "sg.mod.unlimitedDeletedMessagesArchive") }
+    }
+
+    /// A nil limit means retention never evicts entries by count.
+    public static var effectiveDeletedMessagesLimit: Int? {
+        return unlimitedDeletedMessagesArchive ? nil : deletedMessagesLimit
+    }
+
+    public static func deletedArchiveOverflow(count: Int) -> Int {
+        guard let limit = effectiveDeletedMessagesLimit else { return 0 }
+        return max(0, count - limit)
+    }
+
     public static var deletedMessagesLimit: Int {
         get {
             guard let value = UserDefaults.standard.object(forKey: "sg.mod.deletedMessagesLimit") as? Int else { return 200 }

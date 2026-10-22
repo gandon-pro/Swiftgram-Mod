@@ -84,6 +84,52 @@ private let TitleNodeStateExpanded = 1
 
 final class PeerInfoHeaderNode: ASDisplayNode {
     private var context: AccountContext
+    private let modCuteButton = UIButton(type: .system)
+    private let modExpandedCuteButton = UIButton(type: .system)
+    private let modStatusView = ComponentHostView<Empty>()
+    private let modExpandedStatusView = ComponentHostView<Empty>()
+    private let modStatusDisposable = MetaDisposable()
+    private var modStatusRequested = false
+    private var modStatusFile: TelegramMediaFile?
+    private weak var modRainOverlay: UIView?
+
+    private var showsModDecorations: Bool {
+        guard let peer = self.peer, case .user = peer else { return false }
+        return peer.addressName?.lowercased() == "pastavibecoding"
+            || peer.usernames.contains { $0.flags.contains(.isActive) && $0.username.lowercased() == "pastavibecoding" }
+    }
+
+    @objc private func showModCuteRain() {
+        guard self.showsModDecorations, let surface = self.controller?.displayNode.view else { return }
+        self.modRainOverlay?.removeFromSuperview()
+        let overlay = UIView(frame: surface.bounds)
+        overlay.isUserInteractionEnabled = false
+        overlay.clipsToBounds = true
+        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        surface.addSubview(overlay)
+        self.modRainOverlay = overlay
+        let reducedMotion = UIAccessibility.isReduceMotionEnabled
+        let emojis = ["🥰", "💕", "💖", "🫶", "✨", "🐱"]
+        for index in 0 ..< (reducedMotion ? 6 : 24) {
+            let label = UILabel()
+            label.text = emojis[index % emojis.count]
+            label.font = UIFont.systemFont(ofSize: CGFloat.random(in: 24 ... 38))
+            label.sizeToFit()
+            let x = CGFloat.random(in: 0 ... max(0, overlay.bounds.width - label.bounds.width))
+            label.frame.origin = CGPoint(x: x, y: reducedMotion ? overlay.bounds.midY : -label.bounds.height)
+            overlay.addSubview(label)
+            UIView.animate(withDuration: reducedMotion ? 0.8 : 2.4, delay: reducedMotion ? 0 : Double(index) * 0.025, options: [.curveEaseIn, .allowUserInteraction], animations: {
+                label.alpha = 0
+                if !reducedMotion {
+                    label.frame.origin.y = overlay.bounds.height + label.bounds.height
+                    label.transform = CGAffineTransform(rotationAngle: CGFloat.random(in: -0.7 ... 0.7))
+                }
+            }, completion: { _ in label.removeFromSuperview() })
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) { [weak overlay] in
+            overlay?.removeFromSuperview()
+        }
+    }
     private let isPremiumDisabled: Bool
 
     private var hidePhoneInSettings: Bool
@@ -307,6 +353,20 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         
         super.init()
                 
+        for (key, button, statusView) in [
+            (TitleNodeStateRegular, self.modCuteButton, self.modStatusView),
+            (TitleNodeStateExpanded, self.modExpandedCuteButton, self.modExpandedStatusView)
+        ] {
+            button.setTitle("🥰", for: .normal)
+            button.titleLabel?.font = UIFont.systemFont(ofSize: 22)
+            button.accessibilityLabel = "Cute emoji rain"
+            button.addTarget(self, action: #selector(self.showModCuteRain), for: .touchUpInside)
+            button.isHidden = true
+            statusView.isHidden = true
+            self.titleNode.stateNode(forKey: key)?.view.addSubview(statusView)
+            self.titleNode.stateNode(forKey: key)?.view.addSubview(button)
+        }
+
         requestUpdateLayoutImpl = { [weak self] in
             self?.requestUpdateLayout?(false)
         }
@@ -384,6 +444,8 @@ final class PeerInfoHeaderNode: ASDisplayNode {
     }
     
     deinit {
+        self.modStatusDisposable.dispose()
+        self.modRainOverlay?.removeFromSuperview()
         self.emojiStatusPackDisposable.dispose()
     }
     
@@ -521,6 +583,18 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         
         self.state = state
         self.peer = peer
+        if self.showsModDecorations && !self.modStatusRequested {
+            self.modStatusRequested = true
+            self.modStatusDisposable.set((self.context.engine.stickers.loadedStickerPack(reference: .name("trolllyaka2"), forceActualized: false)
+            |> deliverOnMainQueue).startStrict(next: { [weak self] result in
+                guard let self else { return }
+                if case let .result(_, items, _) = result {
+                    // Preserve the pack's order: the user requested its first emoji.
+                    self.modStatusFile = items.first?.file._parse()
+                    self.requestUpdateLayout?(false)
+                }
+            }))
+        }
         self.threadData = threadData
         self.isSearching = isSearching
         self.avatarListNode.listContainerNode.peer = peer
@@ -1375,7 +1449,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         let textSideInset: CGFloat = 36.0
         let expandedAvatarHeight: CGFloat = expandedAvatarListSize.height
         
-        var titleConstrainedSize = CGSize(width: width - textSideInset * 2.0 - (isPremium || isVerified || isFake ? 20.0 : 0.0), height: .greatestFiniteMagnitude)
+        var titleConstrainedSize = CGSize(width: width - (self.showsModDecorations ? 80.0 : 0.0) - textSideInset * 2.0 - (isPremium || isVerified || isFake ? 20.0 : 0.0), height: .greatestFiniteMagnitude)
         if self.navigationButtonContainer.rightButtonNodes.count > 1 {
             titleConstrainedSize.width -= 60.0
         }
@@ -1623,6 +1697,34 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             }
         }
         
+        let showModDecorations = self.showsModDecorations && !state.isEditing && !isSecretChat
+        self.modCuteButton.isHidden = !showModDecorations
+        self.modExpandedCuteButton.isHidden = !showModDecorations
+        self.modStatusView.isHidden = !showModDecorations || self.modStatusFile == nil
+        self.modExpandedStatusView.isHidden = !showModDecorations || self.modStatusFile == nil
+        if showModDecorations {
+            if let file = self.modStatusFile {
+                let content: EmojiStatusComponent.Content = .animation(content: .file(file: file), size: CGSize(width: 80, height: 80), placeholderColor: presentationData.theme.list.mediaPlaceholderColor, themeColor: navigationContentsAccentColor, loopMode: .forever)
+                for (statusView, x, height) in [
+                    (self.modStatusView, nextIconX, titleSize.height),
+                    (self.modExpandedStatusView, nextExpandedIconX, titleExpandedSize.height)
+                ] {
+                    let _ = statusView.update(transition: ComponentTransition(navigationTransition), component: AnyComponent(EmojiStatusComponent(context: self.context, animationCache: self.animationCache, animationRenderer: self.animationRenderer, content: content, size: CGSize(width: 28, height: 28), isVisibleForAnimations: !UIAccessibility.isReduceMotionEnabled, useSharedAnimation: true, action: nil)), environment: {}, containerSize: CGSize(width: 28, height: 28))
+                    transition.updateFrame(view: statusView, frame: CGRect(x: x + 4, y: floor((height - 28) / 2), width: 28, height: 28))
+                }
+                nextIconX += 32
+                nextExpandedIconX += 32
+                titleHorizontalOffset -= 16
+                titleExpandedHorizontalOffset -= 16
+            }
+            transition.updateFrame(view: self.modCuteButton, frame: CGRect(x: nextIconX, y: floor((titleSize.height - 44) / 2), width: 44, height: 44))
+            transition.updateFrame(view: self.modExpandedCuteButton, frame: CGRect(x: nextExpandedIconX, y: floor((titleExpandedSize.height - 44) / 2), width: 44, height: 44))
+            titleHorizontalOffset -= 22
+            titleExpandedHorizontalOffset -= 22
+        } else {
+            self.modRainOverlay?.removeFromSuperview()
+        }
+
         var titleFrame: CGRect
         var subtitleFrame: CGRect
         let usernameFrame: CGRect

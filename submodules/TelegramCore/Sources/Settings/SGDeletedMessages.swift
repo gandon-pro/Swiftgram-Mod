@@ -103,11 +103,10 @@ func sgArchiveDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [Me
             changed = true
         }
     }
-    // Each row has at most 4096 characters; the user-selected row limit also
-    // bounds text storage without an unrelated 512 KB cap truncating it early.
-    while archive.count > SGPrivacySettings.deletedMessagesLimit {
-        let expired = archive.removeFirst()
-        sgRemoveRetainedRows(transaction: transaction, messages: [expired])
+    let overflow = SGPrivacySettings.deletedArchiveOverflow(count: archive.count)
+    if overflow > 0 {
+        sgRemoveRetainedRows(transaction: transaction, messages: Array(archive.prefix(overflow)))
+        archive.removeFirst(overflow)
         changed = true
     }
     if changed {
@@ -123,7 +122,7 @@ func sgArchiveDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [Me
 public func sgTrimDeletedMessages(postbox: Postbox) -> Signal<Void, NoError> {
     return postbox.transaction { transaction -> Void in
         var messages = transaction.getPreferencesEntry(key: sgDeletedMessagesKey)?.get(SGDeletedMessages.self)?.messages ?? []
-        let overflow = max(0, messages.count - SGPrivacySettings.deletedMessagesLimit)
+        let overflow = SGPrivacySettings.deletedArchiveOverflow(count: messages.count)
         guard overflow > 0 else { return }
         sgRemoveRetainedRows(transaction: transaction, messages: Array(messages.prefix(overflow)))
         messages.removeFirst(overflow)
@@ -144,4 +143,35 @@ public func sgClearDeletedMessages(postbox: Postbox) -> Signal<Void, NoError> {
         sgRemoveRetainedRows(transaction: transaction, messages: messages)
         transaction.updatePreferencesEntry(key: sgDeletedMessagesKey, { _ in nil })
     }
+}
+
+/// Persists the explicit copy operation across restarts; never sent as an API attribute.
+public final class SGProtectedMessageCopyAttribute: MessageAttribute {
+    public init() {}
+    public init(decoder: PostboxDecoder) {}
+    public func encode(_ encoder: PostboxEncoder) {}
+}
+
+/// Ordinary cloud text/photos/files only. Expiring media keeps its normal restrictions.
+public func sgCanCopyProtectedMessage(_ message: Message) -> Bool {
+    guard SGPrivacySettings.copyProtectedMessages,
+          message.id.namespace == Namespaces.Message.Cloud,
+          message.id.peerId.namespace != Namespaces.Peer.SecretChat,
+          !message.containsSecretMedia,
+          !message.flags.isSending, !message.flags.contains(.Failed) else { return false }
+    if message.attributes.contains(where: { $0 is AutoclearTimeoutMessageAttribute }) { return false }
+    return message.media.allSatisfy { $0 is TelegramMediaImage || $0 is TelegramMediaFile || $0 is TelegramMediaWebpage }
+        && (!message.text.isEmpty || message.media.contains(where: { $0 is TelegramMediaImage || $0 is TelegramMediaFile }))
+}
+
+/// Client-only decoration. Never changes the account's Telegram Premium status.
+public func sgLocalModEmojiStatus(peer: Peer) -> PeerEmojiStatus? {
+    guard let user = peer as? TelegramUser,
+          user.username?.lowercased() == "pastavibecoding" || user.usernames.contains(where: { $0.flags.contains(.isActive) && $0.username.lowercased() == "pastavibecoding" }),
+          let id = SGPrivacySettings.pastavibeEmojiStatusFileId else { return nil }
+    return PeerEmojiStatus(content: .emoji(fileId: id), expirationDate: nil)
+}
+
+public func sgLocalModEmojiStatus(peer: EnginePeer) -> PeerEmojiStatus? {
+    return sgLocalModEmojiStatus(peer: peer._asPeer())
 }

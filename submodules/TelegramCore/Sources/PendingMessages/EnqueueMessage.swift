@@ -1,4 +1,5 @@
 import Foundation
+import SGSimpleSettings
 import Postbox
 import TelegramApi
 import SwiftSignalKit
@@ -253,6 +254,8 @@ private func convertForwardedMediaForSecretChat(_ media: Media) -> Media {
 private func filterMessageAttributesForOutgoingMessage(_ attributes: [MessageAttribute]) -> [MessageAttribute] {
     return attributes.filter { attribute in
         switch attribute {
+        case _ as SGProtectedMessageCopyAttribute:
+            return true
         case _ as TextEntitiesMessageAttribute:
             return true
         case _ as RichTextMessageAttribute:
@@ -731,7 +734,36 @@ func enqueueMessages(transaction: Transaction, account: Account, peerId: PeerId,
                         updatedMessages.append((true, .forward(source: replyToMessageId.messageId, threadId: threadId, grouping: .none, attributes: attributes, correlationId: nil)))
                     }
                 }
-            case let .forward(sourceId, threadId, _, _, _):
+            case let .forward(sourceId, threadId, grouping, requestedAttributes, correlationId):
+                if let sourceMessage = transaction.getMessage(sourceId), sgCanCopyProtectedMessage(sourceMessage) {
+                    let cachedUser = transaction.getPeerCachedData(peerId: sourceId.peerId) as? CachedUserData
+                    let protectedPeer = transaction.getPeer(sourceId.peerId)?.isCopyProtectionEnabled == true
+                        || cachedUser?.flags.contains(.copyProtectionEnabled) == true
+                        || cachedUser?.flags.contains(.myCopyProtectionEnabled) == true
+                    if sourceMessage.isCopyProtected() || protectedPeer {
+                        // Server forwarding is rejected for protected messages. Enqueue a new
+                        // message and force a real upload rather than reusing its server media ID.
+                        var copyAttributes = sourceMessage.attributes.filter {
+                            $0 is TextEntitiesMessageAttribute || $0 is MediaSpoilerMessageAttribute || $0 is InvertMediaMessageAttribute
+                        }
+                        copyAttributes.append(contentsOf: filterMessageAttributesForOutgoingMessage(requestedAttributes).filter {
+                            !($0 is ForwardOptionsMessageAttribute)
+                        })
+                        copyAttributes.append(SGProtectedMessageCopyAttribute())
+                        let hideCaption = requestedAttributes.contains { ($0 as? ForwardOptionsMessageAttribute)?.hideCaptions == true }
+                        let media = sourceMessage.media.first { $0 is TelegramMediaImage || $0 is TelegramMediaFile }
+                        let text = hideCaption && media != nil ? "" : sourceMessage.text
+                        if hideCaption && media != nil { copyAttributes.removeAll { $0 is TextEntitiesMessageAttribute } }
+                        let reference: AnyMediaReference? = media.map { .message(message: MessageReference(sourceMessage), media: $0) }
+                        let groupingKey: Int64?
+                        switch grouping {
+                        case .none: groupingKey = nil
+                        case .auto: groupingKey = sourceMessage.groupingKey.map { $0 &+ peerId.toInt64() }
+                        }
+                        updatedMessages.append((true, .message(text: text, attributes: copyAttributes, inlineStickers: [:], mediaReference: reference, threadId: threadId, replyToMessageId: threadId.flatMap { EngineMessageReplySubject(messageId: MessageId(peerId: peerId, namespace: Namespaces.Message.Cloud, id: Int32(clamping: $0)), quote: nil, innerSubject: nil) }, replyToStoryId: nil, localGroupingKey: groupingKey, correlationId: correlationId, bubbleUpEmojiOrStickersets: [])))
+                        continue outer
+                    }
+                }
                 if let sourceMessage = forwardedMessageToBeReuploaded(transaction: transaction, id: sourceId) {
                     var mediaReference: AnyMediaReference?
                     if sourceMessage.id.peerId.namespace == Namespaces.Peer.SecretChat {

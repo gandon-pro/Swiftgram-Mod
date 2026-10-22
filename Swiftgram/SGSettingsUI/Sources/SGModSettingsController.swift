@@ -18,7 +18,7 @@ private enum SGModSection: Int32, SGItemListSection {
 }
 
 private enum SGModToggle: Hashable {
-    case pseudoPro, ghost, deleted, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions
+    case pseudoPro, ghost, protectedCopy, unlimitedArchive, deleted, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions
 }
 
 private enum SGModLink: Hashable {
@@ -60,6 +60,10 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
             SGPrivacySettings.backgroundDeletedMessages = value
         case .video60:
             SGPrivacySettings.videoNotes60FPS = value
+        case .protectedCopy:
+            SGPrivacySettings.copyProtectedMessages = value
+        case .unlimitedArchive:
+            SGPrivacySettings.unlimitedDeletedMessagesArchive = value
         case .deleted:
             SGPrivacySettings.keepDeletedMessages = value
             if !value {
@@ -97,7 +101,7 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
             pushImpl?(sgModIconsController(context: context))
         }
     }, action: { action in
-        if action == "saveArchiveLimit", let limit = Int(archiveLimitInput), (1 ... 10000).contains(limit) {
+        if action == "saveArchiveLimit", !SGPrivacySettings.unlimitedDeletedMessagesArchive, let limit = Int(archiveLimitInput), (1 ... 10000).contains(limit) {
             SGPrivacySettings.deletedMessagesLimit = limit
             archiveLimitInput = String(limit)
             let _ = sgTrimDeletedMessages(postbox: context.account.postbox).startStandalone()
@@ -122,6 +126,8 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         }
         entries.append(.notice(id: counter.count, section: .pseudoPro, text: ru ? "Открывает локальные функции клиента: фильтр сообщений, панель форматирования, резервные копии сеансов и оформление. Настоящую подписку Swiftgram Pro или Telegram Premium не оформляет. После изменения заново откройте чат для обновления панели." : "Enables local client features: message filtering, formatting toolbar, session backups and appearance. Does not purchase Swiftgram Pro or Telegram Premium. Reopen the chat after switching to refresh its toolbar."))
         entries.append(.header(id: counter.count, section: .privacy, text: ru ? "Приватность" : "Privacy", badge: nil))
+        entries.append(.toggle(id: counter.count, section: .privacy, settingName: .protectedCopy, value: SGPrivacySettings.copyProtectedMessages, text: ru ? "Пересылка защищённых сообщений" : "Copy protected messages", enabled: true))
+        entries.append(.notice(id: counter.count, section: .privacy, text: ru ? "Позволяет отправлять доступный текст, фото и файлы как новые сообщения от вашего имени. Медиа загружаются заново, отметка автора оригинала не сохраняется. Секретные чаты, одноразовые и самоуничтожающиеся медиа исключены." : "Sends available text, photos and files as new messages from you. Media is uploaded again; the original sender attribution is not retained. Secret chats, view-once and self-destructing media are excluded."))
         entries.append(.toggle(id: counter.count, section: .privacy, settingName: .ghost, value: SGPrivacySettings.ghostMode, text: ru ? "Режим призрака" : "Ghost mode", enabled: true))
         entries.append(.toggle(id: counter.count, section: .privacy, settingName: .online, value: SGPrivacySettings.ghostHideOnline, text: ru ? "Скрывать онлайн" : "Hide online status", enabled: true))
         entries.append(.toggle(id: counter.count, section: .privacy, settingName: .afterSend, value: SGPrivacySettings.ghostHideOnlineAfterSend, text: ru ? "Переходить в офлайн после отправки" : "Request offline after sending", enabled: true))
@@ -137,11 +143,16 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         entries.append(.toggle(id: counter.count, section: .deleted, settingName: .background, value: SGPrivacySettings.backgroundDeletedMessages, text: ru ? "Обрабатывать удалёнки в фоне" : "Process deletions in background", enabled: SGPrivacySettings.keepDeletedMessages))
         entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Обработка продолжается в отведённое iOS фоновое время и при пробуждении push-уведомлением. При возврате обновления синхронизируются. После принудительного закрытия постоянное сканирование недоступно; сообщения, не полученные этим клиентом, восстановить нельзя." : "Processes updates during iOS background time and push wakeups, then synchronizes on return. Continuous scanning after force-quitting is unavailable; messages never received by this client cannot be recovered."))
         entries.append(.disclosure(id: counter.count, section: .deleted, link: .archive, text: ru ? "Архив удалённых сообщений" : "Deleted message archive"))
-        entries.append(.searchInput(id: counter.count, section: .deleted, title: NSAttributedString(string: ru ? "Лимит архива: " : "Archive limit: ", font: Font.regular(ItemListPresentationData(data).fontSize.itemListBaseFontSize), textColor: data.theme.list.itemPrimaryTextColor), text: archiveLimitInput, placeholder: "200"))
-        let validArchiveLimit = Int(archiveLimitInput).map { (1 ... 10000).contains($0) } ?? false
-        entries.append(.action(id: counter.count, section: .deleted, actionType: "saveArchiveLimit", text: ru ? "Сохранить лимит архива" : "Save archive limit", kind: validArchiveLimit ? .generic : .disabled))
-        entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Введите целое число от 1 до 10000 и нажмите «Сохранить». Текущий лимит: \(SGPrivacySettings.deletedMessagesLimit). При уменьшении старейшие записи удаляются из архива и чатов." : "Enter an integer from 1 to 10000, then tap Save. Current limit: \(SGPrivacySettings.deletedMessagesLimit). Reducing it removes the oldest retained entries from the archive and chats."))
-        entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Удалённые сообщения остаются в чате с прозрачностью 50%: до \(SGPrivacySettings.deletedMessagesLimit) записей, включая обычное автоудаление в облачных чатах. Сохраняются текст и ссылки на обычные медиа; не загруженные файлы могут быть недоступны. Секретные чаты, одноразовые и самоуничтожающиеся медиа исключены. Выключение убирает сохранённые сообщения из чата; архив очищается отдельно." : "Deleted messages remain at 50% opacity: up to \(SGPrivacySettings.deletedMessagesLimit) entries, including ordinary cloud-chat auto-delete. Keeps text and ordinary media references; files not downloaded may be unavailable. Secret chats, view-once and self-destructing media are excluded. Switching off removes retained chat messages; clear the archive separately."))
+        entries.append(.toggle(id: counter.count, section: .deleted, settingName: .unlimitedArchive, value: SGPrivacySettings.unlimitedDeletedMessagesArchive, text: ru ? "Безлимитный архив" : "Unlimited archive", enabled: true))
+        entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Отключает удаление старых записей по количеству. Сохранённый числовой лимит применяется только в обычном режиме. После выключения записи сохраняются до следующего пополнения архива или нажатия «Сохранить лимит»." : "Disables eviction by entry count. The saved numeric limit applies only in normal mode. After switching off, entries remain until the next archive addition or Save limit action."))
+        if !SGPrivacySettings.unlimitedDeletedMessagesArchive {
+            entries.append(.searchInput(id: counter.count, section: .deleted, title: NSAttributedString(string: ru ? "Лимит архива: " : "Archive limit: ", font: Font.regular(ItemListPresentationData(data).fontSize.itemListBaseFontSize), textColor: data.theme.list.itemPrimaryTextColor), text: archiveLimitInput, placeholder: "200"))
+            let validArchiveLimit = Int(archiveLimitInput).map { (1 ... 10000).contains($0) } ?? false
+            entries.append(.action(id: counter.count, section: .deleted, actionType: "saveArchiveLimit", text: ru ? "Сохранить лимит архива" : "Save archive limit", kind: validArchiveLimit ? .generic : .disabled))
+            entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Введите целое число от 1 до 10000 и нажмите «Сохранить». Текущий лимит: \(SGPrivacySettings.deletedMessagesLimit). При уменьшении старейшие записи удаляются из архива и чатов." : "Enter an integer from 1 to 10000, then tap Save. Current limit: \(SGPrivacySettings.deletedMessagesLimit). Reducing it removes the oldest retained entries from the archive and chats."))
+        }
+        let archiveCapacity = SGPrivacySettings.unlimitedDeletedMessagesArchive ? (ru ? "без лимита записей" : "no entry limit") : (ru ? "до \(SGPrivacySettings.deletedMessagesLimit) записей" : "up to \(SGPrivacySettings.deletedMessagesLimit) entries")
+        entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Удалённые сообщения остаются в чате с прозрачностью 50%: \(archiveCapacity), включая обычное автоудаление в облачных чатах. Сохраняются текст и ссылки на обычные медиа; не загруженные файлы могут быть недоступны. Секретные чаты, одноразовые и самоуничтожающиеся медиа исключены. Выключение убирает сохранённые сообщения из чата; архив очищается отдельно." : "Deleted messages remain at 50% opacity: \(archiveCapacity), including ordinary cloud-chat auto-delete. Keeps text and ordinary media references; files not downloaded may be unavailable. Secret chats, view-once and self-destructing media are excluded. Switching off removes retained chat messages; clear the archive separately."))
         entries.append(.toggle(id: counter.count, section: .camera, settingName: .video60, value: SGPrivacySettings.videoNotes60FPS, text: ru ? "Кружки: 60 FPS" : "Video messages: 60 FPS", enabled: true))
         entries.append(.notice(id: counter.count, section: .camera, text: ru ? "Выключено — стандартные 30 FPS. В режиме 60 FPS используется одна камера: фронтальная или задняя, с переключением при записи. Камера должна поддерживать формат 60 FPS. Изменение применяется при следующем открытии записи кружка." : "Off uses the default 30 FPS. 60 FPS uses one camera at a time, front or back, with switching while recording. A supported 60 FPS camera format is required. Changes apply the next time video-message recording opens."))
         entries.append(.header(id: counter.count, section: .voice, text: ru ? "Голосовые сообщения" : "Voice messages", badge: nil))

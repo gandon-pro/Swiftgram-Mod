@@ -4,6 +4,12 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 paths = [
+    "submodules/TelegramUI/Sources/AccountContext.swift",
+    "submodules/ChatListUI/Sources/Node/ChatListItem.swift",
+    "submodules/TelegramUI/Components/ChatTitleView/Sources/ChatTitleView.swift",
+    "submodules/TelegramCore/Sources/PendingMessages/EnqueueMessage.swift",
+    "submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift",
+    "submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift",
     "Swiftgram/SGSimpleSettings/Sources/SGPushEnvironment.swift",
     "mod-tools/tests/SGPushEnvironmentTests.swift",
     "submodules/TelegramUI/Sources/SharedAccountContext.swift",

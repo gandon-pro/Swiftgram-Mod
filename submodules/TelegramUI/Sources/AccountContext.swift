@@ -177,6 +177,7 @@ public final class AccountContextImpl: AccountContext {
     public let animationCache: AnimationCache
     public let animationRenderer: MultiAnimationRenderer
     
+    private var modEmojiStatusDisposable: Disposable?
     private var animatedEmojiStickersDisposable: Disposable?
     public private(set) var animatedEmojiStickersValue: [String: [StickerPackItem]] = [:]
     private let animatedEmojiStickersPromise = Promise<[String: [StickerPackItem]]>()
@@ -413,6 +414,13 @@ public final class AccountContextImpl: AccountContext {
             CallSessionManagerImplementationVersion(version: version, supportsVideo: supportsVideo)
         })
         
+        self.modEmojiStatusDisposable = (self.engine.stickers.loadedStickerPack(reference: .name("trolllyaka2"), forceActualized: false)
+        |> deliverOnMainQueue).start(next: { result in
+            if case let .result(_, items, _) = result {
+                SGPrivacySettings.pastavibeEmojiStatusFileId = items.first?.file._parse().fileId.id
+            }
+        })
+
         self.animatedEmojiStickersDisposable = (self.engine.stickers.loadedStickerPack(reference: .animatedEmoji, forceActualized: false)
         |> map { animatedEmoji -> [String: [StickerPackItem]] in
             var animatedEmojiStickers: [String: [StickerPackItem]] = [:]
@@ -514,6 +522,7 @@ public final class AccountContextImpl: AccountContext {
         self.appConfigurationDisposable?.dispose()
         self.countriesConfigurationDisposable?.dispose()
         self.experimentalUISettingsDisposable?.dispose()
+        self.modEmojiStatusDisposable?.dispose()
         self.animatedEmojiStickersDisposable?.dispose()
         self.userLimitsConfigurationDisposable?.dispose()
         self.peerNameColorsConfigurationDisposable?.dispose()
