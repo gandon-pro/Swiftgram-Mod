@@ -408,7 +408,7 @@ func infoItems(
                 guard let controller = interaction?.getController() else {
                     return
                 }
-                PeerInfoEmojiRainOverlay.play(in: controller.view)
+                PeerInfoEmojiRainOverlay.play(from: controller.view)
             }))
         }
 

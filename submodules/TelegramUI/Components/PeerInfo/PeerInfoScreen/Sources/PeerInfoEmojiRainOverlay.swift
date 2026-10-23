@@ -4,14 +4,20 @@ import TelegramCore
 
 // MARK: Swiftgram Mod
 // Full-screen "milota" emoji rain, started from a profile action row.
+// Every drop is a plain CALayer driven by explicit CABasicAnimations, so the
+// effect does not depend on CAEmitterLayer timing or the host layer timeline.
 final class PeerInfoEmojiRainOverlay: UIView {
     // Profiles (lowercased usernames, without "@") that get the rain button.
     static let enabledUsernames: Set<String> = ["pastavibecoding"]
     static let emojis: [String] = ["🥰", "🥺", "💕", "😻", "🧸"]
 
     private static let emissionDuration: Double = 3.5
-    private static let particleLifetime: Float = 6.0
-    private static let imageSide: CGFloat = 128.0
+    private static let dropCount: Int = 70
+    private static let minFallDuration: Double = 2.4
+    private static let maxFallDuration: Double = 4.2
+    private static let minDropSide: CGFloat = 28.0
+    private static let maxDropSide: CGFloat = 46.0
+    private static let imageSide: CGFloat = 96.0
 
     static func isEnabled(for user: TelegramUser) -> Bool {
         var usernames: [String] = user.usernames.filter { $0.isActive }.map { $0.username }
@@ -21,7 +27,9 @@ final class PeerInfoEmojiRainOverlay: UIView {
         return usernames.contains(where: { self.enabledUsernames.contains($0.lowercased()) })
     }
 
-    static func play(in hostView: UIView) {
+    static func play(from sourceView: UIView) {
+        // Cover the whole window (navigation bar included); fall back to the source view.
+        let hostView: UIView = sourceView.window ?? sourceView
         // One rain at a time; repeated taps while it is running are ignored.
         if hostView.subviews.contains(where: { $0 is PeerInfoEmojiRainOverlay }) {
             return
@@ -37,6 +45,7 @@ final class PeerInfoEmojiRainOverlay: UIView {
 
         self.isUserInteractionEnabled = false
         self.backgroundColor = .clear
+        self.layer.zPosition = 1000.0
     }
 
     required init?(coder: NSCoder) {
@@ -44,49 +53,62 @@ final class PeerInfoEmojiRainOverlay: UIView {
     }
 
     private func start() {
-        let cells = PeerInfoEmojiRainOverlay.emojis.compactMap(PeerInfoEmojiRainOverlay.makeCell(emoji:))
-        guard !cells.isEmpty else {
+        let images = PeerInfoEmojiRainOverlay.emojis.compactMap(PeerInfoEmojiRainOverlay.renderEmoji(_:))
+        guard !images.isEmpty, self.bounds.width > 0.0, self.bounds.height > 0.0 else {
             self.removeFromSuperview()
             return
         }
 
-        let emitter = CAEmitterLayer()
-        emitter.frame = self.bounds
-        emitter.emitterShape = .line
-        emitter.emitterPosition = CGPoint(x: self.bounds.midX, y: -PeerInfoEmojiRainOverlay.imageSide * 0.5)
-        emitter.emitterSize = CGSize(width: self.bounds.width * 1.2, height: 1.0)
-        emitter.beginTime = CACurrentMediaTime()
-        emitter.emitterCells = cells
-        self.layer.addSublayer(emitter)
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + PeerInfoEmojiRainOverlay.emissionDuration) { [weak emitter] in
-            emitter?.birthRate = 0.0
+        let count = PeerInfoEmojiRainOverlay.dropCount
+        let interval = PeerInfoEmojiRainOverlay.emissionDuration / Double(count)
+        for i in 0 ..< count {
+            let image = images[i % images.count]
+            DispatchQueue.main.asyncAfter(deadline: .now() + interval * Double(i)) { [weak self] in
+                self?.addDrop(image: image)
+            }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + PeerInfoEmojiRainOverlay.emissionDuration + Double(PeerInfoEmojiRainOverlay.particleLifetime)) { [weak self] in
+
+        let totalDuration = PeerInfoEmojiRainOverlay.emissionDuration + PeerInfoEmojiRainOverlay.maxFallDuration + 0.3
+        DispatchQueue.main.asyncAfter(deadline: .now() + totalDuration) { [weak self] in
             self?.removeFromSuperview()
         }
     }
 
-    private static func makeCell(emoji: String) -> CAEmitterCell? {
-        guard let image = self.renderEmoji(emoji) else {
-            return nil
+    private func addDrop(image: CGImage) {
+        let bounds = self.bounds
+        let side = CGFloat.random(in: PeerInfoEmojiRainOverlay.minDropSide ... PeerInfoEmojiRainOverlay.maxDropSide)
+        let x = CGFloat.random(in: 0.0 ... bounds.width)
+        let startY = -side
+        let endY = bounds.height + side
+        let drift = CGFloat.random(in: -40.0 ... 40.0)
+        let duration = Double.random(in: PeerInfoEmojiRainOverlay.minFallDuration ... PeerInfoEmojiRainOverlay.maxFallDuration)
+
+        let drop = CALayer()
+        drop.contents = image
+        drop.contentsGravity = .resizeAspect
+        drop.bounds = CGRect(origin: .zero, size: CGSize(width: side, height: side))
+        // Model value is the final state, so nothing flashes back when the animation ends.
+        drop.position = CGPoint(x: x + drift, y: endY)
+        self.layer.addSublayer(drop)
+
+        let fall = CABasicAnimation(keyPath: "position")
+        fall.fromValue = NSValue(cgPoint: CGPoint(x: x, y: startY))
+        fall.toValue = NSValue(cgPoint: CGPoint(x: x + drift, y: endY))
+        fall.timingFunction = CAMediaTimingFunction(name: .easeIn)
+
+        let spin = CABasicAnimation(keyPath: "transform.rotation.z")
+        spin.fromValue = 0.0
+        spin.toValue = Double.random(in: -Double.pi ... Double.pi)
+
+        let group = CAAnimationGroup()
+        group.animations = [fall, spin]
+        group.duration = duration
+        group.isRemovedOnCompletion = true
+        drop.add(group, forKey: "rain")
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak drop] in
+            drop?.removeFromSuperlayer()
         }
-        let cell = CAEmitterCell()
-        cell.contents = image
-        cell.birthRate = 3.0
-        cell.lifetime = self.particleLifetime
-        cell.velocity = 160.0
-        cell.velocityRange = 80.0
-        cell.yAcceleration = 90.0
-        // y grows downwards on iOS, so pi/2 points the emission down.
-        cell.emissionLongitude = .pi / 2.0
-        cell.emissionRange = .pi / 10.0
-        cell.spin = 0.0
-        cell.spinRange = 1.5
-        // 128 px source rendered at ~36 pt.
-        cell.scale = 0.28
-        cell.scaleRange = 0.1
-        return cell
     }
 
     private static func renderEmoji(_ emoji: String) -> CGImage? {
