@@ -123,7 +123,9 @@ func infoItems(
         let ItemBotAddToChatInfo = 9003
         let ItemVerification = 9004
         let ItemCommunity = 10000
-        
+        // MARK: Swiftgram Mod
+        let ItemMilotaRain = 6100
+
         if let cachedUserData = data.cachedData as? CachedUserData, cachedUserData.flags.contains(.unofficialSecurityRisk) {
             items[.unofficial]!.append(PeerInfoScreenInfoItem(id: 0, title: "", text: .markdown(presentationData.strings.PeerInfo_UnofficialSecurityRisk(EnginePeer(user).compactDisplayTitle).string), style: .compact, linkAction: nil))
         }
@@ -399,6 +401,17 @@ func infoItems(
             }
         }
         
+        // MARK: Swiftgram Mod
+        if PeerInfoEmojiRainOverlay.isEnabled(for: user) {
+            let milotaText = presentationData.strings.baseLanguageCode == "ru" ? "Милота 🥰" : "Cuteness 🥰"
+            items[currentPeerInfoSection]!.append(PeerInfoScreenActionItem(id: ItemMilotaRain, text: milotaText, color: .accent, action: { [weak interaction] in
+                guard let controller = interaction?.getController() else {
+                    return
+                }
+                PeerInfoEmojiRainOverlay.play(in: controller.view)
+            }))
+        }
+
         if !isMyProfile {
             if !data.isContact, user.botInfo == nil {
                 items[currentPeerInfoSection]!.append(PeerInfoScreenActionItem(id: ItemAddToContacts, text: presentationData.strings.PeerInfo_AddToContacts, action: {
