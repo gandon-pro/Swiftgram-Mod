@@ -2905,6 +2905,16 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             return self.avatarListNode.listContainerNode.setByYouNode.view
         }
         
+        // MARK: Swiftgram Mod
+        // The cute button lives inside the title node, which does not take touches,
+        // so it has to be routed explicitly like the credibility/status icons below.
+        if !(self.state?.isEditing ?? false) {
+            let cuteButton = self.isAvatarExpanded ? self.modExpandedCuteButton : self.modCuteButton
+            if !cuteButton.isHidden, cuteButton.convert(cuteButton.bounds, to: self.view).contains(point) {
+                return cuteButton
+            }
+        }
+
         if !(self.state?.isEditing ?? false) {
             switch self.currentCredibilityIcon {
             case .premium:
