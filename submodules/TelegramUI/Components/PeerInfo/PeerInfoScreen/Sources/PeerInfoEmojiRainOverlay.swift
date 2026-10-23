@@ -1,144 +1,172 @@
 import Foundation
 import UIKit
-import TelegramCore
 
-// MARK: Swiftgram Mod
-// Full-screen "milota" emoji rain, started from a profile action row.
-// Both profile buttons share this effect. Each drop animates only its Y position.
-final class PeerInfoEmojiRainOverlay: UIView {
-    // Profiles (lowercased usernames, without "@") that get the rain button.
-    static let enabledUsernames: Set<String> = ["pastavibecoding"]
-    static let emojis: [String] = ["🥰", "🥺", "💕", "😻", "🧸"]
+private final class PeerInfoEmojiRainDisplayLinkTarget: NSObject {
+    weak var overlay: PeerInfoEmojiRainOverlay?
 
-    private static let emissionDuration: Double = 3.5
-    private static let dropCount: Int = 70
-    private static let minFallDuration: Double = 2.4
-    private static let maxFallDuration: Double = 4.2
-    private static let minDropSide: CGFloat = 28.0
-    private static let maxDropSide: CGFloat = 46.0
-    private static let imageSide: CGFloat = 96.0
-
-    static func isEnabled(for user: TelegramUser) -> Bool {
-        var usernames: [String] = user.usernames.filter { $0.isActive }.map { $0.username }
-        if let addressName = user.addressName {
-            usernames.append(addressName)
-        }
-        return usernames.contains(where: { self.enabledUsernames.contains($0.lowercased()) })
+    @objc func tick(_ link: CADisplayLink) {
+        self.overlay?.advance(to: link.timestamp)
     }
+}
+
+// Draw in the profile's coordinates. Particle X never changes; no layer
+// position/transform animation or raw UIWindow coordinate system is involved.
+final class PeerInfoEmojiRainOverlay: UIView {
+    private struct Drop {
+        let image: UIImage
+        let x: CGFloat
+        let side: CGFloat
+        let startY: CGFloat
+        let endY: CGFloat
+        let birth: CFTimeInterval
+        let duration: Double
+    }
+
+    private static let emissionDuration = 3.5
+    private static let dropCount = 70
+    private static let immediateCount = 6
+    private static let maxFallDuration = 4.2
+    private static let emojis = ["🥰", "🥺", "💕", "😻", "🧸"]
+
+    private var drops: [Drop] = []
+    private var images: [UIImage] = []
+    private let displayLinkTarget = PeerInfoEmojiRainDisplayLinkTarget()
+    private var displayLink: CADisplayLink?
+    private var startTime: CFTimeInterval = 0.0
+    private var frameTime: CFTimeInterval = 0.0
+    private var emitted = 0
+    private var reducedMotion = false
 
     @discardableResult
     static func play(in hostView: UIView) -> PeerInfoEmojiRainOverlay? {
-        // Use the visible window so profile layout cannot cover the first rain.
-        let surface: UIView = hostView.window ?? hostView
-        surface.layoutIfNeeded()
-        guard surface.bounds.width > 0.0, surface.bounds.height > 0.0 else {
-            return nil
-        }
-        // Every tap starts a fresh effect, including taps during an active rain.
-        for running in surface.subviews where running is PeerInfoEmojiRainOverlay {
+        hostView.layoutIfNeeded()
+        guard hostView.bounds.width > 0.0, hostView.bounds.height > 0.0 else { return nil }
+        for running in hostView.subviews where running is PeerInfoEmojiRainOverlay {
             running.removeFromSuperview()
         }
-        let overlay = PeerInfoEmojiRainOverlay(frame: surface.bounds)
+        let overlay = PeerInfoEmojiRainOverlay(frame: hostView.bounds)
         overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        surface.addSubview(overlay)
+        hostView.addSubview(overlay)
+        hostView.bringSubviewToFront(overlay)
         overlay.start()
         return overlay
     }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-
-        self.isUserInteractionEnabled = false
+        self.isOpaque = false
         self.backgroundColor = .clear
+        self.isUserInteractionEnabled = false
         self.clipsToBounds = true
         self.layer.zPosition = 1000.0
+        self.contentMode = .redraw
+        self.displayLinkTarget.overlay = self
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
+    deinit {
+        self.displayLink?.invalidate()
+    }
+
+    override func willMove(toSuperview newSuperview: UIView?) {
+        if newSuperview == nil {
+            self.displayLink?.invalidate()
+            self.displayLink = nil
+        }
+        super.willMove(toSuperview: newSuperview)
+    }
+
     private func start() {
-        let images = PeerInfoEmojiRainOverlay.emojis.compactMap(PeerInfoEmojiRainOverlay.renderEmoji(_:))
-        guard !images.isEmpty else {
-            self.removeFromSuperview()
-            return
+        self.images = Self.emojis.map(Self.renderEmoji)
+        self.reducedMotion = UIAccessibility.isReduceMotionEnabled
+        self.startTime = CACurrentMediaTime()
+        self.frameTime = self.startTime
+        for _ in 0 ..< Self.immediateCount {
+            self.emit(at: self.startTime, visibleAtStart: true)
         }
-
-        let reducedMotion = UIAccessibility.isReduceMotionEnabled
-        let immediateCount = 6
-        // Show a visible first batch synchronously, before scheduling the rest.
-        for i in 0 ..< immediateCount {
-            self.addDrop(image: images[i % images.count], visibleAtStart: true, reducedMotion: reducedMotion)
-        }
-        if reducedMotion {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
-                self?.removeFromSuperview()
-            }
-            return
-        }
-
-        let count = PeerInfoEmojiRainOverlay.dropCount
-        let interval = PeerInfoEmojiRainOverlay.emissionDuration / Double(count - immediateCount)
-        for i in immediateCount ..< count {
-            let image = images[i % images.count]
-            let delay = interval * Double(i - immediateCount + 1)
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                self?.addDrop(image: image, visibleAtStart: false, reducedMotion: false)
-            }
-        }
-
-        let totalDuration = PeerInfoEmojiRainOverlay.emissionDuration + PeerInfoEmojiRainOverlay.maxFallDuration + 0.3
-        DispatchQueue.main.asyncAfter(deadline: .now() + totalDuration) { [weak self] in
-            self?.removeFromSuperview()
-        }
+        // Paint the first batch in the same tap, with no dispatch/delayed start.
+        self.setNeedsDisplay()
+        self.layer.displayIfNeeded()
+        let link = CADisplayLink(target: self.displayLinkTarget, selector: #selector(PeerInfoEmojiRainDisplayLinkTarget.tick(_:)))
+        self.displayLink = link
+        link.add(to: .main, forMode: .common)
     }
 
-    private func addDrop(image: CGImage, visibleAtStart: Bool, reducedMotion: Bool) {
+    fileprivate func advance(to timestamp: CFTimeInterval) {
         guard self.superview != nil else { return }
-        let bounds = self.bounds
-        let side = CGFloat.random(in: PeerInfoEmojiRainOverlay.minDropSide ... PeerInfoEmojiRainOverlay.maxDropSide)
-        let margin = min(side / 2.0, bounds.width / 2.0)
-        let x = CGFloat.random(in: margin ... max(margin, bounds.width - margin))
-        let startY = reducedMotion ? CGFloat.random(in: 0.25 ... 0.75) * bounds.height : (visibleAtStart ? side / 2.0 : -side / 2.0)
-        let endY = bounds.height + side
-        let duration = reducedMotion ? 0.8 : Double.random(in: PeerInfoEmojiRainOverlay.minFallDuration ... PeerInfoEmojiRainOverlay.maxFallDuration)
-
-        let drop = CALayer()
-        drop.contents = image
-        drop.contentsGravity = .resizeAspect
-        drop.bounds = CGRect(origin: .zero, size: CGSize(width: side, height: side))
-        // X stays fixed. Animate Y only so neither drift nor implicit position
-        // animation can send the emoji diagonally across the profile.
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        drop.position = CGPoint(x: x, y: reducedMotion ? startY : endY)
-        if reducedMotion { drop.opacity = 0.0 }
-        self.layer.addSublayer(drop)
-        CATransaction.commit()
-
-        let animation = CABasicAnimation(keyPath: reducedMotion ? "opacity" : "position.y")
-        animation.fromValue = reducedMotion ? 1.0 : startY
-        animation.toValue = reducedMotion ? 0.0 : endY
-        animation.duration = duration
-        animation.timingFunction = CAMediaTimingFunction(name: .linear)
-        drop.add(animation, forKey: "rain")
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) { [weak drop] in
-            drop?.removeFromSuperlayer()
+        self.frameTime = max(timestamp, self.startTime)
+        let elapsed = self.frameTime - self.startTime
+        if !self.reducedMotion {
+            let interval = Self.emissionDuration / Double(Self.dropCount - Self.immediateCount)
+            while self.emitted < Self.dropCount {
+                let delay = interval * Double(self.emitted - Self.immediateCount + 1)
+                if delay > elapsed { break }
+                self.emit(at: self.startTime + delay, visibleAtStart: false)
+            }
+        }
+        self.drops.removeAll { self.frameTime - $0.birth >= $0.duration }
+        let lifetime = self.reducedMotion ? 0.8 : Self.emissionDuration + Self.maxFallDuration
+        if elapsed >= lifetime {
+            self.removeFromSuperview()
+        } else {
+            self.setNeedsDisplay()
         }
     }
 
-    private static func renderEmoji(_ emoji: String) -> CGImage? {
-        let size = CGSize(width: self.imageSide, height: self.imageSide)
+    private func emit(at time: CFTimeInterval, visibleAtStart: Bool) {
+        let side = CGFloat.random(in: 28.0 ... 46.0)
+        let margin = min(side / 2.0, self.bounds.width / 2.0)
+        let x = CGFloat.random(in: margin ... max(margin, self.bounds.width - margin))
+        let startY: CGFloat
+        if self.reducedMotion {
+            startY = CGFloat.random(in: 0.25 ... 0.75) * self.bounds.height
+        } else {
+            startY = visibleAtStart ? side / 2.0 : -side / 2.0
+        }
+        self.drops.append(Drop(image: self.images[self.emitted % self.images.count], x: x, side: side,
+            startY: startY, endY: self.bounds.height + side, birth: time,
+            duration: self.reducedMotion ? 0.8 : Double.random(in: 2.4 ... Self.maxFallDuration)))
+        self.emitted += 1
+    }
+
+    override func draw(_ rect: CGRect) {
+        for drop in self.drops {
+            let progress = CGFloat(min(1.0, max(0.0, (self.frameTime - drop.birth) / drop.duration)))
+            let y = self.reducedMotion ? drop.startY : drop.startY + (drop.endY - drop.startY) * progress
+            drop.image.draw(in: CGRect(x: drop.x - drop.side / 2.0, y: y - drop.side / 2.0,
+                width: drop.side, height: drop.side), blendMode: .normal,
+                alpha: self.reducedMotion ? 1.0 - progress : 1.0)
+        }
+    }
+
+    private static func renderEmoji(_ emoji: String) -> UIImage {
+        let side: CGFloat = 96.0
+        let size = CGSize(width: side, height: side)
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1.0
         format.opaque = false
-        let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            let string = NSAttributedString(string: emoji, attributes: [.font: UIFont.systemFont(ofSize: self.imageSide * 0.8)])
+        return UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            let string = NSAttributedString(string: emoji, attributes: [.font: UIFont.systemFont(ofSize: side * 0.8)])
             let textSize = string.size()
-            string.draw(at: CGPoint(x: (size.width - textSize.width) / 2.0, y: (size.height - textSize.height) / 2.0))
+            string.draw(at: CGPoint(x: (side - textSize.width) / 2.0, y: (side - textSize.height) / 2.0))
         }
-        return image.cgImage
     }
+
+    #if PEERINFO_EMOJI_RAIN_TESTS
+    func prepareForPixelTest() {
+        self.displayLink?.invalidate()
+        self.displayLink = nil
+        self.drops = Array(self.drops.prefix(1))
+        self.emitted = Self.dropCount
+        self.reducedMotion = false
+    }
+
+    func advanceForPixelTest(by elapsed: Double) {
+        self.advance(to: self.startTime + elapsed)
+        self.layer.displayIfNeeded()
+    }
+    #endif
 }

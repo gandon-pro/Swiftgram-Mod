@@ -78,6 +78,9 @@ jobs:
       - name: Test alternate app icon packaging
         run: python3 mod-tools/tests/test_app_icons.py
 
+      - name: Test actual emoji rain rendering on iPhone Simulator
+        run: bash mod-tools/test-emoji-rain-ui.sh
+
       - name: Install the Metal compiler component
         if: inputs.mode == 'ipa'
         run: xcodebuild -downloadComponent MetalToolchain
