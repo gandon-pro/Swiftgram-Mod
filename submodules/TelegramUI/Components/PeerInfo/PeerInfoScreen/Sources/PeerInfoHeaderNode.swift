@@ -101,34 +101,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
 
     @objc private func showModCuteRain() {
         guard self.showsModDecorations, let surface = self.controller?.displayNode.view else { return }
-        self.modRainOverlay?.removeFromSuperview()
-        let overlay = UIView(frame: surface.bounds)
-        overlay.isUserInteractionEnabled = false
-        overlay.clipsToBounds = true
-        overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        surface.addSubview(overlay)
-        self.modRainOverlay = overlay
-        let reducedMotion = UIAccessibility.isReduceMotionEnabled
-        let emojis = ["🥰", "💕", "💖", "🫶", "✨", "🐱"]
-        for index in 0 ..< (reducedMotion ? 6 : 24) {
-            let label = UILabel()
-            label.text = emojis[index % emojis.count]
-            label.font = UIFont.systemFont(ofSize: CGFloat.random(in: 24 ... 38))
-            label.sizeToFit()
-            let x = CGFloat.random(in: 0 ... max(0, overlay.bounds.width - label.bounds.width))
-            label.frame.origin = CGPoint(x: x, y: reducedMotion ? overlay.bounds.midY : -label.bounds.height)
-            overlay.addSubview(label)
-            UIView.animate(withDuration: reducedMotion ? 0.8 : 2.4, delay: reducedMotion ? 0 : Double(index) * 0.025, options: [.curveEaseIn, .allowUserInteraction], animations: {
-                label.alpha = 0
-                if !reducedMotion {
-                    label.frame.origin.y = overlay.bounds.height + label.bounds.height
-                    label.transform = CGAffineTransform(rotationAngle: CGFloat.random(in: -0.7 ... 0.7))
-                }
-            }, completion: { _ in label.removeFromSuperview() })
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) { [weak overlay] in
-            overlay?.removeFromSuperview()
-        }
+        self.modRainOverlay = PeerInfoEmojiRainOverlay.play(in: surface)
     }
     private let isPremiumDisabled: Bool
 
