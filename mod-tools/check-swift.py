@@ -10,6 +10,8 @@ paths = [
     "submodules/TelegramCore/Sources/PendingMessages/EnqueueMessage.swift",
     "submodules/TelegramUI/Sources/ChatInterfaceStateContextMenus.swift",
     "submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoHeaderNode.swift",
+    "submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoEmojiRainOverlay.swift",
+    "submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoProfileItems.swift",
     "Swiftgram/SGSimpleSettings/Sources/SGPushEnvironment.swift",
     "mod-tools/tests/SGPushEnvironmentTests.swift",
     "submodules/TelegramUI/Sources/SharedAccountContext.swift",

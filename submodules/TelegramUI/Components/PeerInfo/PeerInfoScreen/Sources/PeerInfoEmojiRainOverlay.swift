@@ -98,12 +98,16 @@ final class PeerInfoEmojiRainOverlay: UIView {
         let fall = CABasicAnimation(keyPath: "position")
         fall.fromValue = NSValue(cgPoint: CGPoint(x: x, y: startY))
         fall.toValue = NSValue(cgPoint: CGPoint(x: x + drift, y: endY))
+        fall.duration = duration
         fall.timingFunction = CAMediaTimingFunction(name: .easeIn)
 
         let spin = CABasicAnimation(keyPath: "transform.rotation.z")
         spin.fromValue = 0.0
         spin.toValue = Double.random(in: -Double.pi ... Double.pi)
+        spin.duration = duration
 
+        // A group's duration does not scale its children's durations. Keep
+        // both animations running until the drop reaches the bottom.
         let group = CAAnimationGroup()
         group.animations = [fall, spin]
         group.duration = duration
