@@ -21,6 +21,7 @@ import WebUI
 import AvatarNode
 import PeerNameColorItem
 import BoostLevelIconComponent
+import UndoUI
 
 private let enabledPublicBioEntities: EnabledEntityTypes = [.allUrl, .mention, .hashtag]
 private let enabledPrivateBioEntities: EnabledEntityTypes = [.allUrl, .mention, .hashtag] // MARK: Swiftgram
@@ -405,10 +406,14 @@ func infoItems(
         if PeerInfoEmojiRainOverlay.isEnabled(for: user) {
             let milotaText = presentationData.strings.baseLanguageCode == "ru" ? "Милота 🥰" : "Cuteness 🥰"
             items[currentPeerInfoSection]!.append(PeerInfoScreenActionItem(id: ItemMilotaRain, text: milotaText, color: .accent, action: { [weak interaction] in
+                // Diagnostics: the haptic confirms the tap reached this closure,
+                // the toast reports where the rain was attached.
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 guard let controller = interaction?.getController() else {
                     return
                 }
-                PeerInfoEmojiRainOverlay.play(from: controller.view)
+                let status = PeerInfoEmojiRainOverlay.play(in: controller.view)
+                controller.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: "Милота: \(status)", timeout: 3.0, customUndoText: nil), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), in: .window(.root))
             }))
         }
 

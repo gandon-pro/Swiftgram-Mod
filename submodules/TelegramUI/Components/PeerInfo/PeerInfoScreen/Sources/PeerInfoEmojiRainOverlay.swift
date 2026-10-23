@@ -27,17 +27,20 @@ final class PeerInfoEmojiRainOverlay: UIView {
         return usernames.contains(where: { self.enabledUsernames.contains($0.lowercased()) })
     }
 
-    static func play(from sourceView: UIView) {
-        // Cover the whole window (navigation bar included); fall back to the source view.
-        let hostView: UIView = sourceView.window ?? sourceView
+    // Returns a short diagnostic line describing what was started (shown in a toast).
+    @discardableResult
+    static func play(in hostView: UIView) -> String {
+        let size = "\(Int(hostView.bounds.width))x\(Int(hostView.bounds.height))"
         // One rain at a time; repeated taps while it is running are ignored.
-        if hostView.subviews.contains(where: { $0 is PeerInfoEmojiRainOverlay }) {
-            return
+        if let running = hostView.subviews.first(where: { $0 is PeerInfoEmojiRainOverlay }) {
+            hostView.bringSubviewToFront(running)
+            return "already running, host \(size)"
         }
         let overlay = PeerInfoEmojiRainOverlay(frame: hostView.bounds)
         overlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         hostView.addSubview(overlay)
-        overlay.start()
+        let images = overlay.start()
+        return "host \(size), window \(hostView.window != nil ? "yes" : "no"), images \(images)"
     }
 
     override init(frame: CGRect) {
@@ -52,11 +55,11 @@ final class PeerInfoEmojiRainOverlay: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    private func start() {
+    private func start() -> Int {
         let images = PeerInfoEmojiRainOverlay.emojis.compactMap(PeerInfoEmojiRainOverlay.renderEmoji(_:))
         guard !images.isEmpty, self.bounds.width > 0.0, self.bounds.height > 0.0 else {
             self.removeFromSuperview()
-            return
+            return images.count
         }
 
         let count = PeerInfoEmojiRainOverlay.dropCount
@@ -72,6 +75,7 @@ final class PeerInfoEmojiRainOverlay: UIView {
         DispatchQueue.main.asyncAfter(deadline: .now() + totalDuration) { [weak self] in
             self?.removeFromSuperview()
         }
+        return images.count
     }
 
     private func addDrop(image: CGImage) {
