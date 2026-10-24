@@ -4237,7 +4237,12 @@ func replayFinalState(
                     }
                 }
             
-                var messages = messages
+                var messages = messages.filter { message in
+                    guard message.media.contains(where: { $0 is TelegramMediaExpiredContent }),
+                          case let .Id(id) = message.id,
+                          let previous = transaction.getMessage(id) else { return true }
+                    return !sgCanSaveTimedMedia(previous)
+                }
             
                 if case .UpperHistoryBlock = location {
                     for i in 0 ..< messages.count {
