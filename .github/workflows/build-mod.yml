@@ -22,7 +22,7 @@ concurrency:
 jobs:
   build:
     runs-on: macos-26-intel
-    timeout-minutes: 180
+    timeout-minutes: 360
     steps:
       - name: Check out sources
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -100,6 +100,8 @@ jobs:
       - name: Compile iPhone IPA
         id: compile-ipa
         if: inputs.mode == 'ipa'
+        # Leave time for cleanup and saving the Bazel cache before the job limit.
+        timeout-minutes: 300
         run: |
           set -euo pipefail
           python3 mod-tools/prepare-mod-icon.py
