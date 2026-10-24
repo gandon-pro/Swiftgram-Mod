@@ -142,13 +142,8 @@ public enum SGPrivacySettings {
         case .call: return false
         }
     }
-    public static var keepTimedMedia: Bool {
-        get { preference("sg.mod.keepTimedMedia", defaultValue: true) }
-        set { set(newValue, for: "sg.mod.keepTimedMedia") }
-    }
     public static func shouldRetainMessage(isTimedMedia: Bool, hasExpiringMedia: Bool) -> Bool {
-        if isTimedMedia { return keepTimedMedia }
-        return keepDeletedMessages && !hasExpiringMedia
+        return keepDeletedMessages && (isTimedMedia || !hasExpiringMedia)
     }
     public static var keepDeletedMessages: Bool {
         get { preference("sg.mod.keepDeletedMessages", defaultValue: false) }

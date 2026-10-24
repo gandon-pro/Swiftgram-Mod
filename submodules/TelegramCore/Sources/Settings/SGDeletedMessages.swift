@@ -80,12 +80,12 @@ public func sgIsTimedPhotoOrVideo(_ message: Message) -> Bool {
 }
 
 public func sgCanSaveTimedMedia(_ message: Message) -> Bool {
-    return SGPrivacySettings.keepTimedMedia && sgIsTimedPhotoOrVideo(message)
+    return SGPrivacySettings.keepDeletedMessages && sgIsTimedPhotoOrVideo(message)
 }
 
 /// Called before replaying a server deletion, in the same database transaction.
 func sgArchiveDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [MessageId] {
-    guard SGPrivacySettings.keepDeletedMessages || SGPrivacySettings.keepTimedMedia else {
+    guard SGPrivacySettings.keepDeletedMessages else {
         return ids
     }
     var archive = transaction.getPreferencesEntry(key: sgDeletedMessagesKey)?.get(SGDeletedMessages.self)?.messages ?? []
@@ -153,12 +153,7 @@ public func sgTrimDeletedMessages(postbox: Postbox) -> Signal<Void, NoError> {
 public func sgRemoveRetainedMessages(postbox: Postbox) -> Signal<Void, NoError> {
     return postbox.transaction { transaction -> Void in
         let messages = transaction.getPreferencesEntry(key: sgDeletedMessagesKey)?.get(SGDeletedMessages.self)?.messages ?? []
-        let disabled = messages.filter { entry in
-            let id = MessageId(peerId: PeerId(entry.peerId), namespace: Namespaces.Message.Cloud, id: entry.messageId)
-            guard let marker = transaction.getMessage(id)?.attributes.first(where: { $0 is SGDeletedMessageAttribute }) as? SGDeletedMessageAttribute else { return false }
-            return marker.isTimedMedia ? !SGPrivacySettings.keepTimedMedia : !SGPrivacySettings.keepDeletedMessages
-        }
-        sgRemoveRetainedRows(transaction: transaction, messages: disabled)
+        sgRemoveRetainedRows(transaction: transaction, messages: messages)
     }
 }
 

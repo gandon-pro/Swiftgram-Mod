@@ -4,7 +4,7 @@ import Foundation
 struct SGPrivacySettingsTests {
     static func main() {
         let defaults = UserDefaults.standard
-        let keys = ["keepTimedMedia", "selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "unlimitedDeletedMessagesArchive", "copyProtectedMessages", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
+        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "unlimitedDeletedMessagesArchive", "copyProtectedMessages", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
         let old = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, old) {
@@ -41,16 +41,11 @@ struct SGPrivacySettingsTests {
         precondition(SGPrivacySettings.deletedMessagesLimit == 10000)
         defaults.set(-5, forKey: "sg.mod.deletedMessagesLimit")
         precondition(SGPrivacySettings.deletedMessagesLimit == 1)
-        precondition(SGPrivacySettings.keepTimedMedia, "Timed photo/video retention starts enabled")
-        for keepTimed in [false, true] {
-            for keepDeleted in [false, true] {
-                SGPrivacySettings.keepTimedMedia = keepTimed
-                SGPrivacySettings.keepDeletedMessages = keepDeleted
-                precondition(SGPrivacySettings.shouldRetainMessage(isTimedMedia: true, hasExpiringMedia: true) == keepTimed)
-                precondition(SGPrivacySettings.shouldRetainMessage(isTimedMedia: false, hasExpiringMedia: false) == keepDeleted)
-                precondition(!SGPrivacySettings.shouldRetainMessage(isTimedMedia: false, hasExpiringMedia: true), "View-once audio is not photo/video retention")
-                precondition(defaults.bool(forKey: "sg.mod.keepTimedMedia") == keepTimed)
-            }
+        for keepDeleted in [false, true] {
+            SGPrivacySettings.keepDeletedMessages = keepDeleted
+            precondition(SGPrivacySettings.shouldRetainMessage(isTimedMedia: true, hasExpiringMedia: true) == keepDeleted, "Timed photos/videos use the same deleted-messages switch")
+            precondition(SGPrivacySettings.shouldRetainMessage(isTimedMedia: false, hasExpiringMedia: false) == keepDeleted, "Ordinary auto-delete uses that same switch")
+            precondition(!SGPrivacySettings.shouldRetainMessage(isTimedMedia: false, hasExpiringMedia: true), "View-once audio is outside photo/video retention")
         }
         SGPrivacySettings.keepDeletedMessages = false
         precondition(!SGPrivacySettings.copyProtectedMessages)
