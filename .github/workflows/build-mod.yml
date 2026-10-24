@@ -55,6 +55,12 @@ jobs:
           xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGPushEnvironment.swift mod-tools/tests/SGPushEnvironmentTests.swift -o "$RUNNER_TEMP/sg-push-tests"
           "$RUNNER_TEMP/sg-push-tests"
 
+      - name: Test mod build version footer
+        run: |
+          set -euo pipefail
+          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGModBuildInfo.swift mod-tools/tests/SGModBuildInfoTests.swift -o "$RUNNER_TEMP/sg-build-info-tests"
+          "$RUNNER_TEMP/sg-build-info-tests"
+
       - name: Test storage initialization without App Groups entitlement
         run: |
           set -euo pipefail
@@ -155,7 +161,7 @@ jobs:
           from pathlib import Path
           root = Path('build/mod-artifacts')
           ipa = root / 'Niggagram-resign-required.ipa'
-          info = {'commit': os.environ['GITHUB_SHA'], 'run': os.environ['GITHUB_RUN_ID'],
+          info = {'commit': os.environ['GITHUB_SHA'], 'run': os.environ['GITHUB_RUN_ID'], 'build_number': os.environ['GITHUB_RUN_NUMBER'],
                   'sha256': hashlib.sha256(ipa.read_bytes()).hexdigest(),
                   'signing': 'Upstream test identity. Re-sign with your own Apple ID before installing.',
                   'tested_on_device': False, 'bundle_id': 'ph.nigga.graph', 'display_name': 'Niggagram'}

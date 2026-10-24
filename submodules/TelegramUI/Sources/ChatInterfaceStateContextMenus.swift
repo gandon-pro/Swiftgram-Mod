@@ -1496,7 +1496,7 @@ func contextMenuForChatPresentationInterfaceState(chatPresentationInterfaceState
             }
         }
         
-        if resourceAvailable, !message.containsSecretMedia && !isCopyProtected {
+        if resourceAvailable, (!message.containsSecretMedia || sgCanSaveTimedMedia(message)) && (!isCopyProtected || sgCanSaveTimedMedia(message)) {
             var mediaReference: AnyMediaReference?
             var isVideo = false
             for media in message.effectiveMedia {

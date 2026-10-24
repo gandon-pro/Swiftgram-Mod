@@ -30,7 +30,7 @@ class AlternateIconPackagingTests(unittest.TestCase):
                 archive.writestr(prefix + "Swiftgram", b"binary unchanged")
                 archive.writestr(prefix + "Assets.car", b"primary icon unchanged")
                 archive.writestr(prefix + "PlugIns/Share.appex/Info.plist", plistlib.dumps({"CFBundleIdentifier": "ph.telegra.Telegraph.Share"}))
-            branding.brand(source, target)
+            branding.brand(source, target, build_number="42", commit="abcdef0123456789")
             with zipfile.ZipFile(target) as archive:
                 result = plistlib.loads(archive.read(prefix + "Info.plist"))
                 self.assertEqual(archive.read(prefix + "Swiftgram"), b"binary unchanged")
@@ -49,8 +49,11 @@ class AlternateIconPackagingTests(unittest.TestCase):
                         self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
                         self.assertEqual(struct.unpack(">II", data[16:24]), (size, size))
                         self.assertEqual(data[25], 2, "Home Screen icons must be opaque RGB")
+                self.assertEqual(result["SGModBuildNumber"], "42")
+                self.assertEqual(result["SGModCommit"], "abcdef0123456789")
                 extension = plistlib.loads(archive.read(prefix + "PlugIns/Share.appex/Info.plist"))
                 self.assertNotIn("CFBundleIcons", extension)
+                self.assertNotIn("SGModBuildNumber", extension)
 
 
 if __name__ == "__main__":

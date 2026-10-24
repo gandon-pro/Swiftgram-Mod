@@ -4,6 +4,10 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 paths = [
+    "mod-tools/tests/SGModBuildInfoTests.swift",
+    "Swiftgram/SGSimpleSettings/Sources/SGModBuildInfo.swift",
+    "submodules/GalleryUI/Sources/SecretMediaPreviewController.swift",
+
     "submodules/TelegramUI/Sources/AccountContext.swift",
     "submodules/ChatListUI/Sources/Node/ChatListItem.swift",
     "submodules/TelegramUI/Components/ChatTitleView/Sources/ChatTitleView.swift",

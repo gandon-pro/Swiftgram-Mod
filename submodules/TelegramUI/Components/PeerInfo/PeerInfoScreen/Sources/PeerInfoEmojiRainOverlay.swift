@@ -9,8 +9,8 @@ private final class PeerInfoEmojiRainDisplayLinkTarget: NSObject {
     }
 }
 
-// Draw in the profile's coordinates. Particle X never changes; no layer
-// position/transform animation or raw UIWindow coordinate system is involved.
+// The canvas belongs to the profile. Particle trajectories are expressed in
+// window coordinates and converted back each frame to cancel parent transforms.
 final class PeerInfoEmojiRainOverlay: UIView {
     private struct Drop {
         let image: UIImage
@@ -36,6 +36,8 @@ final class PeerInfoEmojiRainOverlay: UIView {
     private var frameTime: CFTimeInterval = 0.0
     private var emitted = 0
     private var reducedMotion = false
+    private weak var coordinateView: UIView?
+    private var emissionBounds = CGRect.zero
 
     @discardableResult
     static func play(in hostView: UIView) -> PeerInfoEmojiRainOverlay? {
@@ -80,6 +82,9 @@ final class PeerInfoEmojiRainOverlay: UIView {
     }
 
     private func start() {
+        let coordinates: UIView = self.window ?? self.superview ?? self
+        self.coordinateView = coordinates
+        self.emissionBounds = self.convert(self.bounds, to: coordinates)
         self.images = Self.emojis.map(Self.renderEmoji)
         self.reducedMotion = UIAccessibility.isReduceMotionEnabled
         self.startTime = CACurrentMediaTime()
@@ -119,15 +124,16 @@ final class PeerInfoEmojiRainOverlay: UIView {
     private func emit(at time: CFTimeInterval, visibleAtStart: Bool) {
         let side = CGFloat.random(in: 28.0 ... 46.0)
         let margin = min(side / 2.0, self.bounds.width / 2.0)
-        let x = CGFloat.random(in: margin ... max(margin, self.bounds.width - margin))
-        let startY: CGFloat
-        if self.reducedMotion {
-            startY = CGFloat.random(in: 0.25 ... 0.75) * self.bounds.height
+        let localX: CGFloat
+        if visibleAtStart {
+            localX = margin + (self.bounds.width - 2.0 * margin) * CGFloat(self.emitted + 1) / CGFloat(Self.immediateCount + 1)
         } else {
-            startY = visibleAtStart ? side / 2.0 : -side / 2.0
+            localX = CGFloat.random(in: margin ... max(margin, self.bounds.width - margin))
         }
-        self.drops.append(Drop(image: self.images[self.emitted % self.images.count], x: x, side: side,
-            startY: startY, endY: self.bounds.height + side, birth: time,
+        let localY = self.reducedMotion ? CGFloat.random(in: 0.25 ... 0.75) * self.bounds.height : (visibleAtStart ? side / 2.0 : -side / 2.0)
+        let start = self.convert(CGPoint(x: localX, y: localY), to: self.coordinateView ?? self)
+        self.drops.append(Drop(image: self.images[self.emitted % self.images.count], x: start.x, side: side,
+            startY: start.y, endY: self.emissionBounds.maxY + side, birth: time,
             duration: self.reducedMotion ? 0.8 : Double.random(in: 2.4 ... Self.maxFallDuration)))
         self.emitted += 1
     }
@@ -136,7 +142,10 @@ final class PeerInfoEmojiRainOverlay: UIView {
         for drop in self.drops {
             let progress = CGFloat(min(1.0, max(0.0, (self.frameTime - drop.birth) / drop.duration)))
             let y = self.reducedMotion ? drop.startY : drop.startY + (drop.endY - drop.startY) * progress
-            drop.image.draw(in: CGRect(x: drop.x - drop.side / 2.0, y: y - drop.side / 2.0,
+            let windowPoint = CGPoint(x: drop.x, y: y)
+            let coordinates = self.coordinateView ?? self
+            let localPoint = self.convert(windowPoint, from: coordinates)
+            drop.image.draw(in: CGRect(x: localPoint.x - drop.side / 2.0, y: localPoint.y - drop.side / 2.0,
                 width: drop.side, height: drop.side), blendMode: .normal,
                 alpha: self.reducedMotion ? 1.0 - progress : 1.0)
         }
@@ -159,7 +168,11 @@ final class PeerInfoEmojiRainOverlay: UIView {
     func prepareForPixelTest() {
         self.displayLink?.invalidate()
         self.displayLink = nil
-        self.drops = Array(self.drops.prefix(1))
+        if let first = self.drops.first {
+            self.drops = [Drop(image: first.image, x: self.emissionBounds.midX, side: 32.0,
+                startY: self.emissionBounds.minY + 16.0, endY: self.emissionBounds.maxY + 32.0,
+                birth: first.birth, duration: 3.0)]
+        }
         self.emitted = Self.dropCount
         self.reducedMotion = false
     }

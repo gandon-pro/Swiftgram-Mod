@@ -89,6 +89,13 @@ func managedAutoremoveMessageOperations(network: Network, postbox: Postbox, isRe
                             // remove the timer entry to avoid scheduling it again.
                             transaction.clearTimestampBasedAttribute(id: entry.messageId, tag: tag)
                         } else {
+                            if sgCanSaveTimedMedia(message) {
+                                let deletable = sgArchiveDeletedMessages(transaction: transaction, ids: [message.id])
+                                if deletable.isEmpty {
+                                    transaction.clearTimestampBasedAttribute(id: entry.messageId, tag: tag)
+                                    return
+                                }
+                            }
                             transaction.updateMessage(message.id, update: { currentMessage in
                                 var storeForwardInfo: StoreMessageForwardInfo?
                                 if let forwardInfo = currentMessage.forwardInfo {

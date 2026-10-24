@@ -1,5 +1,6 @@
 """Set the install identity in the IPA that will be signed by the user's signing tool."""
 import argparse
+import os
 import plistlib
 import re
 import zipfile
@@ -11,7 +12,7 @@ CUSTOM_ICONS = ("NGCustom1", "NGCustom2", "NGCustom3")
 ICON_DIRECTORY = Path(__file__).resolve().parent / "app-icons"
 
 
-def brand(source: Path, destination: Path):
+def brand(source: Path, destination: Path, build_number=None, commit=None):
     with zipfile.ZipFile(source) as archive:
         mains = [name for name in archive.namelist() if re.fullmatch(r"Payload/[^/]+\.app/Info.plist", name)]
         if len(mains) != 1:
@@ -38,6 +39,10 @@ def brand(source: Path, destination: Path):
                 if info.filename.startswith(app_root) and info.filename.endswith("/Info.plist"):
                     plist = rewrite(plistlib.loads(data))
                     if info.filename == main:
+                        if build_number is not None:
+                            plist["SGModBuildNumber"] = str(build_number)
+                        if commit:
+                            plist["SGModCommit"] = str(commit)
                         plist["CFBundleDisplayName"] = APP_NAME
                         plist["CFBundleName"] = APP_NAME
                         for key in ("CFBundleIcons", "CFBundleIcons~ipad"):
@@ -81,5 +86,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("destination", type=Path)
+    parser.add_argument("--build-number", default=os.environ.get("GITHUB_RUN_NUMBER"))
+    parser.add_argument("--commit", default=os.environ.get("GITHUB_SHA"))
     args = parser.parse_args()
-    brand(args.source, args.destination)
+    brand(args.source, args.destination, build_number=args.build_number, commit=args.commit)

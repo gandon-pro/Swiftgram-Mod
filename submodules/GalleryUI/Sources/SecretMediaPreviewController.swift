@@ -13,6 +13,7 @@ import AppBundle
 import LocalizedPeerData
 import TooltipUI
 import TelegramNotices
+import SaveToCameraRoll
 
 private func galleryMediaForMedia(media: Media) -> Media? {
     if let media = media as? TelegramMediaImage {
@@ -147,6 +148,7 @@ private final class SecretMediaPreviewControllerNode: GalleryControllerNode {
 public final class SecretMediaPreviewController: ViewController {
     private let context: AccountContext
     private let messageId: MessageId
+    private let saveTimedMediaButton = UIButton(type: .system)
     
     private let _ready = Promise<Bool>()
     override public var ready: Promise<Bool> {
@@ -237,6 +239,28 @@ public final class SecretMediaPreviewController: ViewController {
         self.centralItemAttributesDisposable.dispose()
     }
     
+    @objc private func saveTimedMediaPressed() {
+        guard let message = self.messageView?.message, sgCanSaveTimedMedia(message) else { return }
+        var reference: AnyMediaReference?
+        for media in message.media {
+            if let image = media as? TelegramMediaImage {
+                reference = ImageMediaReference.message(message: MessageReference(message), media: image).abstract
+                break
+            } else if let file = media as? TelegramMediaFile, file.isVideo {
+                reference = FileMediaReference.message(message: MessageReference(message), media: file).abstract
+                break
+            }
+        }
+        guard let reference else { return }
+        self.saveTimedMediaButton.isEnabled = false
+        let _ = (saveToCameraRoll(context: self.context, userLocation: .peer(message.id.peerId), mediaReference: reference)
+        |> deliverOnMainQueue).startStandalone(completed: { [weak self] in
+            guard let self else { return }
+            self.saveTimedMediaButton.isEnabled = true
+            self.saveTimedMediaButton.setTitle(self.presentationData.strings.Common_Done, for: .normal)
+        })
+    }
+
     @objc func donePressed() {
         self.dismiss(forceAway: false)
     }
@@ -273,6 +297,16 @@ public final class SecretMediaPreviewController: ViewController {
         
         self.controllerNode.statusBar = self.statusBar
         self.controllerNode.navigationBar = self.navigationBar
+        self.saveTimedMediaButton.setTitle(self.presentationData.strings.Common_Save, for: .normal)
+        self.saveTimedMediaButton.setTitleColor(.white, for: .normal)
+        self.saveTimedMediaButton.titleLabel?.font = Font.semibold(16.0)
+        self.saveTimedMediaButton.backgroundColor = UIColor(white: 0.0, alpha: 0.65)
+        self.saveTimedMediaButton.layer.cornerRadius = 22.0
+        self.saveTimedMediaButton.layer.zPosition = 1000.0
+        self.saveTimedMediaButton.isHidden = true
+        self.saveTimedMediaButton.addTarget(self, action: #selector(self.saveTimedMediaPressed), for: .touchUpInside)
+        self.controllerNode.view.addSubview(self.saveTimedMediaButton)
+
         
         self.controllerNode.transitionDataForCentralItem = { [weak self] in
             if let strongSelf = self {
@@ -499,6 +533,7 @@ public final class SecretMediaPreviewController: ViewController {
     }
     
     private func applyMessageView() {
+        self.saveTimedMediaButton.isHidden = !(self.messageView?.message.map(sgCanSaveTimedMedia) ?? false)
         var message: Message?
         if let messageView = self.messageView, let m = messageView.message {
             message = m
@@ -650,6 +685,11 @@ public final class SecretMediaPreviewController: ViewController {
         
         self.controllerNode.frame = CGRect(origin: CGPoint(), size: layout.size)
         self.controllerNode.containerLayoutUpdated(layout, navigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
+        let saveSize = CGSize(width: 140.0, height: 44.0)
+        self.saveTimedMediaButton.frame = CGRect(x: layout.size.width - layout.safeInsets.right - saveSize.width - 16.0,
+            y: layout.size.height - max(layout.intrinsicInsets.bottom, layout.safeInsets.bottom) - saveSize.height - 16.0, width: saveSize.width, height: saveSize.height)
+        self.controllerNode.view.bringSubviewToFront(self.saveTimedMediaButton)
+
     }
     
     override public func dismiss(completion: (() -> Void)? = nil) {

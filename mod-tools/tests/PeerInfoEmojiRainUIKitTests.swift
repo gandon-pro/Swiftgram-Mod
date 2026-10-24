@@ -43,7 +43,8 @@ private final class TestController: UIViewController {
     let button = UIButton(type: .system)
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.view.backgroundColor = .white
+        self.view.backgroundColor = .clear
+        self.view.isOpaque = false
         self.view.addSubview(self.profile)
         self.profile.addSubview(self.button)
         self.button.frame = CGRect(x: 40, y: 600, width: 100, height: 44)
@@ -61,12 +62,12 @@ private final class TestController: UIViewController {
         check(overlay.superview === self.profile, "overlay must use profile coordinates")
         check(overlay.frame == self.profile.bounds, "overlay must fill profile bounds")
         check(!overlay.isUserInteractionEnabled, "rain must not consume subsequent taps")
-        check(centroid(overlay).weight > 20, "first tap must render visible emoji synchronously")
+        check(centroid(self.view).weight > 20, "first tap must render visible emoji synchronously")
         overlay.prepareForPixelTest()
         overlay.advanceForPixelTest(by: 0.1)
-        let first = centroid(overlay)
+        let first = centroid(self.view)
         overlay.advanceForPixelTest(by: 0.5)
-        let later = centroid(overlay)
+        let later = centroid(self.view)
         check(first.weight > 20 && later.weight > 20, "both sampled frames must contain emoji pixels")
         check(abs(first.x - later.x) < 0.25, "rendered emoji moved sideways")
         check((later.y - first.y) * renderedDownSign > 10, "rendered emoji must move down")
@@ -76,7 +77,7 @@ private final class TestController: UIViewController {
         check(overlays.count == 1 && overlays.first !== overlay, "repeat tap must start exactly one fresh rain")
         check(overlay.superview == nil, "previous rain must be detached")
         if let next = overlays.first {
-            check(centroid(next).weight > 20, "repeat tap must also render immediately")
+            check(centroid(self.view).weight > 20, "repeat tap must also render immediately")
             next.prepareForPixelTest()
             next.advanceForPixelTest(by: 9.0)
             check(next.superview == nil, "rain must remove itself after its lifetime")
@@ -106,6 +107,10 @@ private final class TestController: UIViewController {
             renderedDownSign = bottom.y > top.y ? 1.0 : -1.0
             check(top.weight > 0 && bottom.weight > 0 && abs(top.y - bottom.y) > 90, "bitmap direction calibration")
             // Several independent positions/sizes exercise actual rendered pixels.
+            for _ in 0 ..< 20 { controller.run() }
+            // A tilted parent used to make a local-Y trajectory move right in
+            // the visible screen. Capture the parent, not just the canvas.
+            controller.profile.transform = CGAffineTransform(a: 1.0, b: 0.0, c: 0.12, d: 1.0, tx: 0.0, ty: 0.0)
             for _ in 0 ..< 20 { controller.run() }
             let result: [String: Any] = ["checks": checks, "failures": failures, "passed": failures.isEmpty]
             let data = try! JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])

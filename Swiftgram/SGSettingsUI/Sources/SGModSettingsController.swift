@@ -15,10 +15,11 @@ private enum SGModSection: Int32, SGItemListSection {
     case deleted
     case camera
     case voice
+    case build
 }
 
 private enum SGModToggle: Hashable {
-    case pseudoPro, ghost, protectedCopy, unlimitedArchive, deleted, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions
+    case timedMedia, pseudoPro, ghost, protectedCopy, unlimitedArchive, deleted, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions
 }
 
 private enum SGModLink: Hashable {
@@ -64,6 +65,11 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
             SGPrivacySettings.copyProtectedMessages = value
         case .unlimitedArchive:
             SGPrivacySettings.unlimitedDeletedMessagesArchive = value
+        case .timedMedia:
+            SGPrivacySettings.keepTimedMedia = value
+            if !value {
+                let _ = sgRemoveRetainedMessages(postbox: context.account.postbox).start()
+            }
         case .deleted:
             SGPrivacySettings.keepDeletedMessages = value
             if !value {
@@ -128,6 +134,8 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         entries.append(.header(id: counter.count, section: .privacy, text: ru ? "Приватность" : "Privacy", badge: nil))
         entries.append(.toggle(id: counter.count, section: .privacy, settingName: .protectedCopy, value: SGPrivacySettings.copyProtectedMessages, text: ru ? "Пересылка защищённых сообщений" : "Copy protected messages", enabled: true))
         entries.append(.notice(id: counter.count, section: .privacy, text: ru ? "Позволяет отправлять доступный текст, фото и файлы как новые сообщения от вашего имени. Медиа загружаются заново, отметка автора оригинала не сохраняется. Секретные чаты, одноразовые и самоуничтожающиеся медиа исключены." : "Sends available text, photos and files as new messages from you. Media is uploaded again; the original sender attribution is not retained. Secret chats, view-once and self-destructing media are excluded."))
+        entries.append(.toggle(id: counter.count, section: .privacy, settingName: .timedMedia, value: SGPrivacySettings.keepTimedMedia, text: ru ? "Сохранять фото и видео с таймером" : "Keep timed photos and videos", enabled: true))
+        entries.append(.notice(id: counter.count, section: .privacy, text: ru ? "Оставляет полученные фото и видео с таймером в облачных чатах. В просмотре доступна кнопка «Сохранить». Уже исчезнувшие или не полученные файлы восстановить нельзя. Секретные чаты не затрагиваются." : "Keeps received timed photos and videos in cloud chats. A Save button is available in the viewer. Already expired or unavailable files cannot be restored. Does not change secret chats."))
         entries.append(.toggle(id: counter.count, section: .privacy, settingName: .ghost, value: SGPrivacySettings.ghostMode, text: ru ? "Режим призрака" : "Ghost mode", enabled: true))
         entries.append(.toggle(id: counter.count, section: .privacy, settingName: .online, value: SGPrivacySettings.ghostHideOnline, text: ru ? "Скрывать онлайн" : "Hide online status", enabled: true))
         entries.append(.toggle(id: counter.count, section: .privacy, settingName: .afterSend, value: SGPrivacySettings.ghostHideOnlineAfterSend, text: ru ? "Переходить в офлайн после отправки" : "Request offline after sending", enabled: true))
@@ -152,12 +160,14 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
             entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Введите целое число от 1 до 10000 и нажмите «Сохранить». Текущий лимит: \(SGPrivacySettings.deletedMessagesLimit). При уменьшении старейшие записи удаляются из архива и чатов." : "Enter an integer from 1 to 10000, then tap Save. Current limit: \(SGPrivacySettings.deletedMessagesLimit). Reducing it removes the oldest retained entries from the archive and chats."))
         }
         let archiveCapacity = SGPrivacySettings.unlimitedDeletedMessagesArchive ? (ru ? "без лимита записей" : "no entry limit") : (ru ? "до \(SGPrivacySettings.deletedMessagesLimit) записей" : "up to \(SGPrivacySettings.deletedMessagesLimit) entries")
-        entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Удалённые сообщения остаются в чате с прозрачностью 50%: \(archiveCapacity), включая обычное автоудаление в облачных чатах. Сохраняются текст и ссылки на обычные медиа; не загруженные файлы могут быть недоступны. Секретные чаты, одноразовые и самоуничтожающиеся медиа исключены. Выключение убирает сохранённые сообщения из чата; архив очищается отдельно." : "Deleted messages remain at 50% opacity: \(archiveCapacity), including ordinary cloud-chat auto-delete. Keeps text and ordinary media references; files not downloaded may be unavailable. Secret chats, view-once and self-destructing media are excluded. Switching off removes retained chat messages; clear the archive separately."))
+        entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Удалённые сообщения остаются в чате с прозрачностью 50%: \(archiveCapacity), включая обычное автоудаление в облачных чатах. Сохраняются текст и ссылки на обычные медиа; не загруженные файлы могут быть недоступны. Сохранение фото и видео с таймером настраивается отдельно выше. Секретные чаты исключены. Выключение убирает сохранённые сообщения из чата; архив очищается отдельно." : "Deleted messages remain at 50% opacity: \(archiveCapacity), including ordinary cloud-chat auto-delete. Keeps text and ordinary media references; files not downloaded may be unavailable. Timed photos and videos have a separate setting above. Secret chats are excluded. Switching off removes retained chat messages; clear the archive separately."))
         entries.append(.toggle(id: counter.count, section: .camera, settingName: .video60, value: SGPrivacySettings.videoNotes60FPS, text: ru ? "Кружки: 60 FPS" : "Video messages: 60 FPS", enabled: true))
         entries.append(.notice(id: counter.count, section: .camera, text: ru ? "Выключено — стандартные 30 FPS. В режиме 60 FPS используется одна камера: фронтальная или задняя, с переключением при записи. Камера должна поддерживать формат 60 FPS. Изменение применяется при следующем открытии записи кружка." : "Off uses the default 30 FPS. 60 FPS uses one camera at a time, front or back, with switching while recording. A supported 60 FPS camera format is required. Changes apply the next time video-message recording opens."))
         entries.append(.header(id: counter.count, section: .voice, text: ru ? "Голосовые сообщения" : "Voice messages", badge: nil))
         entries.append(.oneFromManySelector(id: counter.count, section: .voice, settingName: "voiceEffect", text: ru ? "Войсченджер" : "Voice changer", value: SGPrivacySettings.voiceEffect.title(russian: ru), enabled: true))
         entries.append(.notice(id: counter.count, section: .voice, text: ru ? "Эффект применяется к новым голосовым сообщениям и слышен в предпрослушивании перед отправкой. Выберите «Без эффекта», чтобы выключить. Уже записанные фрагменты, кружки и звонки не меняются." : "Applies to new voice recordings and is audible in the preview before sending. Select Off to disable. Existing recorded segments, video messages and calls are unchanged."))
+        entries.append(.header(id: counter.count, section: .build, text: ru ? "Версия сборки" : "Build version", badge: nil))
+        entries.append(.notice(id: counter.count, section: .build, text: SGModBuildInfo.text))
         let state = ItemListControllerState(presentationData: ItemListPresentationData(data), title: .text("Nigga"), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: data.strings.Common_Back))
         return (state, (ItemListNodeState(presentationData: ItemListPresentationData(data), entries: entries, style: .blocks, ensureVisibleItemTag: nil), arguments))
     }
