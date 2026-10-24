@@ -4493,6 +4493,11 @@ func replayFinalState(
             case let .EditMessage(id, message):
                 var generatedEvent: (reactionAuthor: Peer, reaction: MessageReaction.Reaction, message: Message, timestamp: Int32)?
                 transaction.updateMessage(id, update: { previousMessage in
+                    // Do not replace a locally kept timed photo/video with the
+                    // server's expired-content placeholder on resynchronization.
+                    if sgCanSaveTimedMedia(previousMessage), message.media.contains(where: { $0 is TelegramMediaExpiredContent }) {
+                        return .skip
+                    }
                     var updatedFlags = message.flags
                     var updatedLocalTags = message.localTags
                     var updatedAttributes = message.attributes

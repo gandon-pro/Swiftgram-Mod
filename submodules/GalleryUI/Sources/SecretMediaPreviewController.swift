@@ -257,7 +257,6 @@ public final class SecretMediaPreviewController: ViewController {
         |> deliverOnMainQueue).startStandalone(completed: { [weak self] in
             guard let self else { return }
             self.saveTimedMediaButton.isEnabled = true
-            self.saveTimedMediaButton.setTitle(self.presentationData.strings.Common_Done, for: .normal)
         })
     }
 
