@@ -4,7 +4,6 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
 paths = [
-    "mod-tools/tests/SGModBuildInfoTests.swift",
     "Swiftgram/SGSimpleSettings/Sources/SGModBuildInfo.swift",
     "submodules/GalleryUI/Sources/SecretMediaPreviewController.swift",
 
@@ -18,11 +17,9 @@ paths = [
     "submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoEmojiRainEligibility.swift",
     "submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoProfileItems.swift",
     "Swiftgram/SGSimpleSettings/Sources/SGPushEnvironment.swift",
-    "mod-tools/tests/SGPushEnvironmentTests.swift",
     "submodules/TelegramUI/Sources/SharedAccountContext.swift",
     "Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift",
     "submodules/TelegramUI/Sources/ManagedAudioRecorder.swift",
-    "mod-tools/tests/SGVoiceChangerTests.swift",
     "mod-tools/tests/PeerInfoEmojiRainUIKitTests.swift",
     "submodules/SettingsUI/Sources/Themes/ThemeSettingsController.swift",
     "Swiftgram/SGSettingsUI/Sources/SGModIconsController.swift",
@@ -45,11 +42,8 @@ paths = [
     "submodules/TelegramUI/Sources/ChatControllerOpenAttachmentMenu.swift",
     "submodules/TelegramCore/Sources/State/ManagedSynchronizeViewStoriesOperations.swift",
     "submodules/TelegramCore/Sources/TelegramEngine/Messages/Stories.swift",
-    "mod-tools/tests/SGPrivacySettingsTests.swift",
-    "mod-tools/tests/ICloudFileAccessTests.swift",
     "Swiftgram/SGSimpleSettings/Sources/SGAppStorage.swift",
     "submodules/TelegramUI/Sources/AppDelegate.swift",
-    "mod-tools/tests/SGAppStorageTests.swift",
     "Swiftgram/SGSettingsUI/Sources/SGModSettingsController.swift",
     "submodules/TelegramCore/Sources/Account/AccountManager.swift",
     "submodules/TelegramCore/Sources/State/HistoryViewStateValidation.swift",

@@ -29,9 +29,32 @@ device="$(xcrun simctl list devices available --json | python3 -c 'import json,s
 xcrun simctl boot "$device" || true
 python3 -c 'import subprocess,sys; subprocess.run(["xcrun","simctl","bootstatus",sys.argv[1],"-b"],check=True,timeout=360)' "$device"
 python3 -c 'import subprocess,sys; subprocess.run(["xcrun","simctl","install",sys.argv[1],sys.argv[2]],check=True,timeout=120)' "$device" "$app"
-python3 -c 'import subprocess,sys; subprocess.run(["xcrun","simctl","launch",sys.argv[1],"org.swiftgram.emoji-rain-tests"],check=True,timeout=60)' "$device"
 container="$(xcrun simctl get_app_container "$device" org.swiftgram.emoji-rain-tests data)"
-for attempt in $(seq 1 120); do
+mkdir -p "$container/Documents"
+rm -f "$container/Documents/rain-ui-ready" "$container/Documents/rain-ui-start" "$container/Documents/rain-ui-result.json"
+# A cold simulator may acknowledge launch late. A live app handshake is the
+# authority here; a launch timeout alone must never count as a passing test.
+python3 - "$device" "$container" <<'PY'
+import pathlib
+import subprocess
+import sys
+import time
+
+device, container = sys.argv[1:]
+documents = pathlib.Path(container) / "Documents"
+try:
+    subprocess.run(["xcrun", "simctl", "launch", device, "org.swiftgram.emoji-rain-tests"], check=True, timeout=180)
+except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
+    print(f"Simulator launch did not acknowledge: {error}; checking app readiness", flush=True)
+deadline = time.monotonic() + 30
+while not (documents / "rain-ui-ready").exists():
+    if time.monotonic() >= deadline:
+        raise SystemExit("Simulator app never became ready; pixel tests did not start")
+    time.sleep(0.5)
+print("Simulator app ready; starting pixel tests", flush=True)
+(documents / "rain-ui-start").touch()
+PY
+for attempt in $(seq 1 180); do
   if [[ -s "$container/Documents/rain-ui-result.json" ]]; then
     cat "$container/Documents/rain-ui-result.json"
     python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); sys.exit(0 if r["passed"] else 1)' "$container/Documents/rain-ui-result.json"

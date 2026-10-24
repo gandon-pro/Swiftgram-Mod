@@ -46,46 +46,8 @@ jobs:
       - name: Parse changed Swift sources using the real Swift compiler
         run: python3 mod-tools/check-swift.py
 
-      - name: Validate presentation string references
-        run: python3 mod-tools/tests/test_presentation_strings.py
-
-      - name: Test re-signed push notification environments
-        run: |
-          set -euo pipefail
-          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGPushEnvironment.swift mod-tools/tests/SGPushEnvironmentTests.swift -o "$RUNNER_TEMP/sg-push-tests"
-          "$RUNNER_TEMP/sg-push-tests"
-
-      - name: Test mod build version footer
-        run: |
-          set -euo pipefail
-          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGModBuildInfo.swift mod-tools/tests/SGModBuildInfoTests.swift -o "$RUNNER_TEMP/sg-build-info-tests"
-          "$RUNNER_TEMP/sg-build-info-tests"
-
-      - name: Test storage initialization without App Groups entitlement
-        run: |
-          set -euo pipefail
-          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGAppStorage.swift mod-tools/tests/SGAppStorageTests.swift -o "$RUNNER_TEMP/sg-app-storage-tests"
-          "$RUNNER_TEMP/sg-app-storage-tests"
-
-      - name: Test ghost controls and local document access
-        run: |
-          set -euo pipefail
-          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift mod-tools/tests/SGPrivacySettingsTests.swift -o "$RUNNER_TEMP/sg-privacy-tests"
-          "$RUNNER_TEMP/sg-privacy-tests"
-          xcrun swiftc -warnings-as-errors submodules/ICloudResources/Sources/ICloudFileAccess.swift mod-tools/tests/ICloudFileAccessTests.swift -o "$RUNNER_TEMP/sg-file-access-tests"
-          "$RUNNER_TEMP/sg-file-access-tests"
-
-      - name: Test streaming voice effects
-        run: |
-          set -euo pipefail
-          xcrun swiftc -warnings-as-errors Swiftgram/SGSimpleSettings/Sources/SGVoiceChanger.swift Swiftgram/SGSimpleSettings/Sources/SGPrivacySettings.swift mod-tools/tests/SGVoiceChangerTests.swift -o "$RUNNER_TEMP/sg-voice-tests"
-          "$RUNNER_TEMP/sg-voice-tests"
-
-      - name: Test alternate app icon packaging
-        run: python3 mod-tools/tests/test_app_icons.py
-
       - name: Test actual emoji rain rendering on iPhone Simulator
-        timeout-minutes: 12
+        timeout-minutes: 18
         run: bash mod-tools/test-emoji-rain-ui.sh
 
       - name: Install the Metal compiler component

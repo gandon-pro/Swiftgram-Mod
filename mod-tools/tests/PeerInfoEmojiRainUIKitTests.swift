@@ -87,6 +87,34 @@ private final class TestController: UIViewController {
 
 @main final class TestApp: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
+    private func runIteration(_ index: Int, controller: TestController, documents: URL) {
+        if index == 20 {
+            controller.profile.transform = CGAffineTransform(a: 1.0, b: 0.0, c: 0.12, d: 1.0, tx: 0.0, ty: 0.0)
+        }
+        autoreleasepool { controller.run() }
+        if index + 1 < 40 {
+            // Return to UIKit between captures so the launch watchdog and
+            // simulator services can keep processing their own work.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                self.runIteration(index + 1, controller: controller, documents: documents)
+            }
+        } else {
+            let result: [String: Any] = ["checks": checks, "failures": failures, "passed": failures.isEmpty]
+            let data = try! JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])
+            try! data.write(to: documents.appendingPathComponent("rain-ui-result.json"), options: .atomic)
+        }
+    }
+
+    private func waitForStart(controller: TestController, documents: URL) {
+        guard FileManager.default.fileExists(atPath: documents.appendingPathComponent("rain-ui-start").path) else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.waitForStart(controller: controller, documents: documents)
+            }
+            return
+        }
+        self.runIteration(0, controller: controller, documents: documents)
+    }
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let controller = TestController()
@@ -106,16 +134,11 @@ private final class TestController: UIViewController {
             let bottom = centroid(reference)
             renderedDownSign = bottom.y > top.y ? 1.0 : -1.0
             check(top.weight > 0 && bottom.weight > 0 && abs(top.y - bottom.y) > 90, "bitmap direction calibration")
-            // Several independent positions/sizes exercise actual rendered pixels.
-            for _ in 0 ..< 20 { autoreleasepool { controller.run() } }
-            // A tilted parent used to make a local-Y trajectory move right in
-            // the visible screen. Capture the parent, not just the canvas.
-            controller.profile.transform = CGAffineTransform(a: 1.0, b: 0.0, c: 0.12, d: 1.0, tx: 0.0, ty: 0.0)
-            for _ in 0 ..< 20 { autoreleasepool { controller.run() } }
-            let result: [String: Any] = ["checks": checks, "failures": failures, "passed": failures.isEmpty]
-            let data = try! JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])
-            let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("rain-ui-result.json")
-            try! data.write(to: url)
+            // The host starts the pixel workload only after simctl launch
+            // completes (or the readiness handshake confirms a running app).
+            let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            try! Data().write(to: documents.appendingPathComponent("rain-ui-ready"), options: .atomic)
+            self.waitForStart(controller: controller, documents: documents)
         }
         return true
     }
