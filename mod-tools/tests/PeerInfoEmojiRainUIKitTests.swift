@@ -93,7 +93,7 @@ private final class TestController: UIViewController {
         window.rootViewController = controller
         window.makeKeyAndVisible()
         self.window = window
-        DispatchQueue.main.async {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             // Calibrate bitmap row order using UIKit views at known positions.
             let reference = UIView(frame: CGRect(x: 0, y: 0, width: 50, height: 200))
             reference.backgroundColor = .clear
@@ -107,11 +107,11 @@ private final class TestController: UIViewController {
             renderedDownSign = bottom.y > top.y ? 1.0 : -1.0
             check(top.weight > 0 && bottom.weight > 0 && abs(top.y - bottom.y) > 90, "bitmap direction calibration")
             // Several independent positions/sizes exercise actual rendered pixels.
-            for _ in 0 ..< 20 { controller.run() }
+            for _ in 0 ..< 20 { autoreleasepool { controller.run() } }
             // A tilted parent used to make a local-Y trajectory move right in
             // the visible screen. Capture the parent, not just the canvas.
             controller.profile.transform = CGAffineTransform(a: 1.0, b: 0.0, c: 0.12, d: 1.0, tx: 0.0, ty: 0.0)
-            for _ in 0 ..< 20 { controller.run() }
+            for _ in 0 ..< 20 { autoreleasepool { controller.run() } }
             let result: [String: Any] = ["checks": checks, "failures": failures, "passed": failures.isEmpty]
             let data = try! JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])
             let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("rain-ui-result.json")

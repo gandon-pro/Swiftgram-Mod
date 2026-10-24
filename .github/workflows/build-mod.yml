@@ -85,6 +85,7 @@ jobs:
         run: python3 mod-tools/tests/test_app_icons.py
 
       - name: Test actual emoji rain rendering on iPhone Simulator
+        timeout-minutes: 12
         run: bash mod-tools/test-emoji-rain-ui.sh
 
       - name: Install the Metal compiler component

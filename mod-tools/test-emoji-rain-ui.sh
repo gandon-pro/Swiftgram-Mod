@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -euxo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -20,18 +20,18 @@ cat > "$app/Info.plist" <<'PLIST'
 </dict></plist>
 PLIST
 sdk="$(xcrun --sdk iphonesimulator --show-sdk-path)"
-xcrun --sdk iphonesimulator swiftc -sdk "$sdk" -target "$(uname -m)-apple-ios17.0-simulator" \
+xcrun --sdk iphonesimulator swiftc -O -sdk "$sdk" -target "$(uname -m)-apple-ios17.0-simulator" \
   -D PEERINFO_EMOJI_RAIN_TESTS \
   "$root/submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen/Sources/PeerInfoEmojiRainOverlay.swift" \
   "$root/mod-tools/tests/PeerInfoEmojiRainUIKitTests.swift" -o "$app/EmojiRainTest"
 codesign --force --sign - --timestamp=none "$app"
 device="$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for group in d["devices"].values() for x in group if "iPhone" in x["name"]))')"
 xcrun simctl boot "$device" || true
-xcrun simctl bootstatus "$device" -b
-xcrun simctl install "$device" "$app"
-xcrun simctl launch "$device" org.swiftgram.emoji-rain-tests
+python3 -c 'import subprocess,sys; subprocess.run(["xcrun","simctl","bootstatus",sys.argv[1],"-b"],check=True,timeout=360)' "$device"
+python3 -c 'import subprocess,sys; subprocess.run(["xcrun","simctl","install",sys.argv[1],sys.argv[2]],check=True,timeout=120)' "$device" "$app"
+python3 -c 'import subprocess,sys; subprocess.run(["xcrun","simctl","launch",sys.argv[1],"org.swiftgram.emoji-rain-tests"],check=True,timeout=60)' "$device"
 container="$(xcrun simctl get_app_container "$device" org.swiftgram.emoji-rain-tests data)"
-for attempt in $(seq 1 90); do
+for attempt in $(seq 1 120); do
   if [[ -s "$container/Documents/rain-ui-result.json" ]]; then
     cat "$container/Documents/rain-ui-result.json"
     python3 -c 'import json,sys; r=json.load(open(sys.argv[1])); sys.exit(0 if r["passed"] else 1)' "$container/Documents/rain-ui-result.json"
