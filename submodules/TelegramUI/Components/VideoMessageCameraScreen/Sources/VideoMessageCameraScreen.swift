@@ -962,7 +962,7 @@ public class VideoMessageCameraScreen: ViewController {
             let experimentalSettings = self.context.sharedContext.immediateExperimentalUISettings
             let useModernVideoMessagePipeline = experimentalSettings.useModernVideoMessagePipeline ?? (self.context.getAppConfigValue("ios_killswitch_disable_neo_round_camera_v2") == nil)
             let mode: NeoCameraImpl.RoundVideoMode?
-            switch useModernVideoMessagePipeline ? experimentalSettings.videoMessageCameraMode : .legacy {
+            switch useModernVideoMessagePipeline && !SGPrivacySettings.videoNotes60FPS ? experimentalSettings.videoMessageCameraMode : .legacy {
             case .legacy:
                 mode = nil
             case .vga:

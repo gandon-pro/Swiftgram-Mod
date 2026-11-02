@@ -1,5 +1,6 @@
 import Foundation
 internal import TelegramApi
+import SGSimpleSettings
 import Postbox
 import SwiftSignalKit
 import MtProtoKit
@@ -15,12 +16,30 @@ private final class AccountPresenceManagerImpl {
     private var shouldKeepOnlinePresenceDisposable: Disposable?
     private let currentRequestDisposable = MetaDisposable()
     private var onlineTimer: SignalKitTimer?
+    private var privacyObserver: NSObjectProtocol?
+    private var sentObserver: NSObjectProtocol?
     
     private var wasOnline: Bool = false
+    private var requestedOnline: Bool?
     
     init(queue: Queue, shouldKeepOnlinePresence: Signal<Bool, NoError>, network: Network) {
         self.queue = queue
         self.network = network
+        self.sentObserver = NotificationCenter.default.addObserver(forName: SGPrivacySettings.messageSent, object: nil, queue: nil) { [weak self] note in
+            guard let self, let source = note.object as? Network, source === self.network else { return }
+            self.queue.async { [weak self] in
+                guard let self, SGPrivacySettings.hideOnlineAfterSend else { return }
+                // A send can update server presence even when our last explicit
+                // request was offline. Bypass the offline-request deduplication.
+                self.updatePresence(self.wasOnline, forceOffline: true)
+            }
+        }
+        self.privacyObserver = NotificationCenter.default.addObserver(forName: SGPrivacySettings.changed, object: nil, queue: nil) { [weak self] _ in
+            self?.queue.async { [weak self] in
+                guard let self = self else { return }
+                self.updatePresence(self.wasOnline)
+            }
+        }
         
         self.shouldKeepOnlinePresenceDisposable = (shouldKeepOnlinePresence
         |> distinctUntilChanged
@@ -40,10 +59,24 @@ private final class AccountPresenceManagerImpl {
         self.shouldKeepOnlinePresenceDisposable?.dispose()
         self.currentRequestDisposable.dispose()
         self.onlineTimer?.invalidate()
+        if let observer = self.privacyObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = self.sentObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
-    private func updatePresence(_ isOnline: Bool) {
+    private func updatePresence(_ isOnline: Bool, forceOffline: Bool = false) {
+        let isOnline = isOnline && !SGPrivacySettings.hideOnline && !forceOffline
         let request: Signal<Api.Bool, MTRpcError>
+        self.onlineTimer?.invalidate()
+        self.onlineTimer = nil
+        // Do not keep updating "last seen" with periodic offline requests in ghost mode.
+        if !isOnline && self.requestedOnline == false && !forceOffline {
+            return
+        }
+        self.requestedOnline = isOnline
         if isOnline {
             let timer = SignalKitTimer(timeout: 30.0, repeat: false, completion: { [weak self] in
                 guard let strongSelf = self else {

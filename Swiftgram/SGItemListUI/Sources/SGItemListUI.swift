@@ -82,6 +82,7 @@ public enum SGItemListUIEntry<Section: SGItemListSection, BoolSetting: Hashable,
     case header(id: Int, section: Section, text: String, badge: String?)
     case toggle(id: Int, section: Section, settingName: BoolSetting, value: Bool, text: String, enabled: Bool)
     case notice(id: Int, section: Section, text: String)
+    case plainNotice(id: Int, section: Section, text: String)
     case percentageSlider(id: Int, section: Section, settingName: SliderSetting, value: Int32)
     case oneFromManySelector(id: Int, section: Section, settingName: OneFromManySetting, text: String, value: String, enabled: Bool)
     case disclosure(id: Int, section: Section, link: DisclosureLink, text: String)
@@ -95,7 +96,7 @@ public enum SGItemListUIEntry<Section: SGItemListSection, BoolSetting: Hashable,
             return sectionId.rawValue
         case let .toggle(_, sectionId, _, _, _, _):
             return sectionId.rawValue
-        case let .notice(_, sectionId, _):
+        case let .notice(_, sectionId, _), let .plainNotice(_, sectionId, _):
             return sectionId.rawValue
             
         case let .disclosure(_, sectionId, _, _):
@@ -123,7 +124,7 @@ public enum SGItemListUIEntry<Section: SGItemListSection, BoolSetting: Hashable,
             return stableIdValue
         case let .toggle(stableIdValue, _, _, _, _, _):
             return stableIdValue
-        case let .notice(stableIdValue, _, _):
+        case let .notice(stableIdValue, _, _), let .plainNotice(stableIdValue, _, _):
             return stableIdValue
         case let .disclosure(stableIdValue, _, _, _):
             return stableIdValue
@@ -152,7 +153,8 @@ public enum SGItemListUIEntry<Section: SGItemListSection, BoolSetting: Hashable,
         case let (.toggle(id1, section1, settingName1, value1, text1, enabled1), .toggle(id2, section2, settingName2, value2, text2, enabled2)):
             return id1 == id2 && section1 == section2 && settingName1 == settingName2 && value1 == value2 && text1 == text2 && enabled1 == enabled2
         
-        case let (.notice(id1, section1, text1), .notice(id2, section2, text2)):
+        case let (.notice(id1, section1, text1), .notice(id2, section2, text2)),
+             let (.plainNotice(id1, section1, text1), .plainNotice(id2, section2, text2)):
             return id1 == id2 && section1 == section2 && text1 == text2
         
         case let (.percentageSlider(id1, section1, settingName1, value1), .percentageSlider(id2, section2, settingName2, value2)):
@@ -190,6 +192,9 @@ public enum SGItemListUIEntry<Section: SGItemListSection, BoolSetting: Hashable,
             })
         case let .notice(_, _, string):
             return ItemListTextItem(presentationData: presentationData, text: .markdown(string), sectionId: self.section)
+        case let .plainNotice(_, _, string):
+            let text = NSAttributedString(string: string, font: Font.regular(13.0), textColor: presentationData.theme.list.freeTextColor.withAlphaComponent(0.5))
+            return ItemListTextItem(presentationData: presentationData, text: .custom(context: arguments.context, string: text), sectionId: self.section)
         case let .disclosure(_, _, link, text):
             return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: "", sectionId: self.section, style: .blocks) {
                 arguments.openDisclosureLink(link)
@@ -221,7 +226,7 @@ public enum SGItemListUIEntry<Section: SGItemListSection, BoolSetting: Hashable,
                     arguments.action(actionType)
             })
         case let .searchInput(_, _, title, text, placeholder):
-            return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: title, text: text, placeholder: placeholder, returnKeyType: .done, spacing: 3.0, clearType: .always, selectAllOnFocus: true, secondaryStyle: true, sectionId: self.section, textUpdated: { input in arguments.searchInput(input) }, action: {}, dismissKeyboardOnEnter: true)
+            return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: title, text: text, placeholder: placeholder, returnKeyType: .done, spacing: 3.0, clearType: .always, selectAllOnFocus: true, secondaryStyle: false, sectionId: self.section, textUpdated: { input in arguments.searchInput(input) }, action: {}, dismissKeyboardOnEnter: true)
         }
     }
 }
@@ -246,7 +251,7 @@ public func filterSGItemListUIEntrires<Section: SGItemListSection & Hashable, Bo
             return text.lowercased().contains(query)
         case .toggle(_, _, _, _, let text, _):
             return text.lowercased().contains(query)
-        case .notice(_, _, let text):
+        case .notice(_, _, let text), .plainNotice(_, _, let text):
             return text.lowercased().contains(query)
         case .percentageSlider:
             return false // Assuming percentage sliders don't have searchable text

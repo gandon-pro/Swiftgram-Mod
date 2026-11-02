@@ -4,6 +4,34 @@ import AsyncDisplayKit
 import SwiftSignalKit
 import SGSimpleSettings
 
+public func niggagramAppBadgeImage() -> UIImage? {
+    // Match the stock @3x badge (279 x 66 pixels). A wider badge overlaps
+    // the compact Dynamic Island on iPhone 14 Pro / Pro Max.
+    let size = CGSize(width: 93.0, height: 22.0)
+    UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
+    defer { UIGraphicsEndImageContext() }
+    UIColor(red: 0.49, green: 0.22, blue: 0.82, alpha: 1.0).setFill()
+    UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: size.height / 2).fill()
+    if let portrait = UIImage(bundleImageName: "ModPrivacy") {
+        let rect = CGRect(x: 2, y: 2, width: 18, height: 18)
+        UIGraphicsGetCurrentContext()?.saveGState()
+        UIBezierPath(ovalIn: rect).addClip()
+        portrait.draw(in: rect)
+        UIGraphicsGetCurrentContext()?.restoreGState()
+    }
+    let text = "NIGGAGRAM" as NSString
+    let availableWidth = size.width - 24.0 - 4.0
+    var font = UIFont.systemFont(ofSize: 11.0, weight: .semibold)
+    let measuredWidth = text.size(withAttributes: [.font: font]).width
+    if measuredWidth > availableWidth {
+        font = font.withSize(font.pointSize * availableWidth / measuredWidth)
+    }
+    let textSize = text.size(withAttributes: [.font: font])
+    let textRect = CGRect(x: 24.0 + (availableWidth - textSize.width) / 2.0, y: (size.height - textSize.height) / 2.0, width: textSize.width, height: textSize.height)
+    text.draw(in: textRect, withAttributes: [.font: font, .foregroundColor: UIColor.white])
+    return UIGraphicsGetImageFromCurrentImageContext()
+}
+
 private struct WindowReservedArea: Equatable {
     var safeInsets: UIEdgeInsets
     var reservedCorners: ContainerViewLayoutCorners
@@ -474,10 +502,11 @@ public class Window1 {
     public init(hostView: WindowHostView, statusBarHost: StatusBarHost?) {
         self.hostView = hostView
         self.badgeView = UIImageView()
-        if SGSimpleSettings.shared.status > 1, let image = UIImage(bundleImageName: SGSimpleSettings.shared.customAppBadge) {
+        let savedBadge = SGSimpleSettings.shared.customAppBadge
+        if !savedBadge.isEmpty && savedBadge != "NiggagramAppBadge", let image = UIImage(bundleImageName: savedBadge) {
             self.badgeView.image = image
         } else {
-        self.badgeView.image = UIImage(bundleImageName: "Components/AppBadge")
+            self.badgeView.image = niggagramAppBadgeImage()
         }
         self.badgeView.isHidden = true
         

@@ -333,7 +333,11 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         let appGroupName = "group.\(baseAppBundleId)"
 
         let configuration = URLSessionConfiguration.background(withIdentifier: identifier)
-        configuration.sharedContainerIdentifier = appGroupName
+        // ESign and personal-team signatures can omit the App Groups entitlement.
+        // A background session without a shared container uses the app sandbox.
+        if FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName) != nil {
+            configuration.sharedContainerIdentifier = appGroupName
+        }
         configuration.isDiscretionary = false
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: .main)
         self.urlSessions.append(session)
@@ -589,10 +593,12 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         
         let baseAppBundleId = Bundle.main.bundleIdentifier!
         let appGroupName = "group.\(baseAppBundleId)"
-        try! PasscodeEnvironment.shared.configure(PasscodeConfiguration(appGroupIdentifier: appGroupName, processRole: .mainApp, biometricKeychainService: walletBiometricKeychainService), privateAccessGroup: {
-            BuildConfig.keychainAccessGroup(baseAppBundleId: baseAppBundleId)
-        })
-        let maybeAppGroupUrl = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName)
+        let privateContainer = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        if FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupName) != nil {
+            try? PasscodeEnvironment.shared.configure(PasscodeConfiguration(appGroupIdentifier: appGroupName, processRole: .mainApp, biometricKeychainService: walletBiometricKeychainService), privateAccessGroup: {
+                BuildConfig.keychainAccessGroup(baseAppBundleId: baseAppBundleId)
+            })
+        }
         
         let buildConfig = BuildConfig(baseAppBundleId: baseAppBundleId)
         self.buildConfig = buildConfig
@@ -625,12 +631,7 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
                 CallSessionManagerImplementationVersion(version: version, supportsVideo: supportsVideo)
             },
             appData: self.regularDeviceToken.get() |> map { token in
-                let tokenEnvironment: String
-                #if DEBUG
-                tokenEnvironment = "sandbox"
-                #else
-                tokenEnvironment = "production"
-                #endif
+                let tokenEnvironment = SGPushEnvironment.tokenEnvironment
                 
                 let data = buildConfig.bundleData(withAppToken: token, tokenType: "apns", tokenEnvironment: tokenEnvironment, signatureDict: signatureDict)
                 if let data = data, let _ = String(data: data, encoding: .utf8) {
@@ -715,8 +716,31 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             networkEngineFactory: RustNetworkEngineFactory()
         )
         
-        guard let appGroupUrl = maybeAppGroupUrl else {
-            self.mainWindow?.presentNative(UIAlertController(title: nil, message: "Error 2", preferredStyle: .alert))
+        let appGroupUrl: URL
+        do {
+            appGroupUrl = try SGAppStorage.resolve(
+                appGroupIdentifier: appGroupName,
+                groupContainer: { FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: $0) },
+                privateContainer: privateContainer
+            )
+        } catch {
+            // Always show an actual screen if storage cannot be initialized.
+            let controller = UIViewController()
+            controller.view.backgroundColor = .systemBackground
+            let label = UILabel()
+            label.text = "Niggagram could not initialize local storage.\n\(error.localizedDescription)"
+            label.textColor = .label
+            label.numberOfLines = 0
+            label.textAlignment = .center
+            label.translatesAutoresizingMaskIntoConstraints = false
+            controller.view.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: controller.view.safeAreaLayoutGuide.leadingAnchor, constant: 24),
+                label.trailingAnchor.constraint(equalTo: controller.view.safeAreaLayoutGuide.trailingAnchor, constant: -24),
+                label.centerYAnchor.constraint(equalTo: controller.view.centerYAnchor)
+            ])
+            self.window?.rootViewController = controller
+            self.window?.makeKeyAndVisible()
             return true
         }
         
@@ -1070,12 +1094,15 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             }
         }, getAlternateIconName: {
             if #available(iOS 10.3, *) {
-                return application.alternateIconName
+                return SGPrivacySettings.currentAppIconName(reportedName: application.alternateIconName)
             } else {
                 return nil
             }
         }, requestSetAlternateIconName: { name, completion in
             application.setAlternateIconName(name, completionHandler: { error in
+                if error == nil {
+                    SGPrivacySettings.selectedAppIconName = name
+                }
                 if let error = error {
                    Logger.shared.log("App \(self.episodeId)", "failed to set alternate icon with error \(error.localizedDescription)")
                 }
@@ -1708,6 +1735,37 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         
         if #available(iOS 13.0, *) {
             let cleanupTaskId = "\(baseAppBundleId).cleanup"
+            BGTaskScheduler.shared.register(forTaskWithIdentifier: "\(baseAppBundleId).deletedMessagesRefresh", using: DispatchQueue.main) { [weak self] task in
+                guard let self else {
+                    task.setTaskCompleted(success: false)
+                    return
+                }
+                self.scheduleDeletedMessagesRefresh()
+                guard SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages else {
+                    task.setTaskCompleted(success: true)
+                    return
+                }
+                let disposable = MetaDisposable()
+                var completed = false
+                let finish: (Bool) -> Void = { success in
+                    guard !completed else { return }
+                    completed = true
+                    disposable.dispose()
+                    task.setTaskCompleted(success: success)
+                }
+                task.expirationHandler = {
+                    DispatchQueue.main.async { finish(false) }
+                }
+                disposable.set((self.sharedContextPromise.get()
+                |> take(1)
+                |> deliverOnMainQueue).start(next: { context in
+                    guard !completed else { return }
+                    // Reuse Telegram's network/difference machinery; do not run
+                    // a fake audio session or an unbounded background loop.
+                    context.wakeupManager.allowBackgroundTimeExtension(timeout: 25.0, extendNow: true)
+                    context.wakeupManager.replaceCurrentExtensionWithExternalTime(completion: { finish(true) }, timeout: 25.0)
+                }))
+            }
             
             BGTaskScheduler.shared.register(forTaskWithIdentifier: cleanupTaskId, using: DispatchQueue.main) { task in
                 Logger.shared.log("App \(self.episodeId)", "Executing cleanup task")
@@ -2137,7 +2195,24 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         })
     }
 
+    private func scheduleDeletedMessagesRefresh() {
+        guard #available(iOS 13.0, *) else { return }
+        let identifier = "\(Bundle.main.bundleIdentifier!).deletedMessagesRefresh"
+        guard SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages else {
+            BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: identifier)
+            return
+        }
+        let request = BGAppRefreshTaskRequest(identifier: identifier)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            Logger.shared.log("DeletedMessages", "Background refresh unavailable: \(error)")
+        }
+    }
+
     func handleDidEnterBackground() {
+        self.scheduleDeletedMessagesRefresh()
         let _ = (self.sharedContextPromise.get()
         |> take(1)
         |> deliverOnMainQueue).start(next: { sharedApplicationContext in
@@ -2150,7 +2225,11 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
             if !sharedApplicationContext.sharedContext.energyUsageSettings.extendBackgroundWork {
                 extendNow = false
             }
-            sharedApplicationContext.wakeupManager.allowBackgroundTimeExtension(timeout: 2.0, extendNow: extendNow)
+            let retainInBackground = SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages
+            if retainInBackground && !ProcessInfo.processInfo.isLowPowerModeEnabled {
+                extendNow = true
+            }
+            sharedApplicationContext.wakeupManager.allowBackgroundTimeExtension(timeout: retainInBackground ? 25.0 : 2.0, extendNow: extendNow)
             
             let _ = (sharedApplicationContext.sharedContext.activeAccountContexts
              |> take(1)
@@ -2215,6 +2294,11 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
              |> deliverOnMainQueue).start(next: { activeAccounts in
                 for (_, context, _) in activeAccounts.accounts {
                     // MARK: Swiftgram
+                    if SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages {
+                        // Wait for queued difference updates; their deletion paths
+                        // archive cached messages before history validation removes them.
+                        let _ = context.account.stateManager.pollStateUpdateCompletion().startStandalone()
+                    }
                     if !sgTasksLaunched {
                         updateSGWebSettingsInteractivelly(context: context)
                         updateSGGHSettingsInteractivelly(context: context)
@@ -2273,7 +2357,8 @@ private func extractAccountManagerState(records: AccountRecordsView<TelegramAcco
         let _ = (self.sharedContextPromise.get()
         |> take(1)
         |> deliverOnMainQueue).start(next: { sharedApplicationContext in
-            sharedApplicationContext.wakeupManager.allowBackgroundTimeExtension(timeout: 2.0)
+            let retainInBackground = SGPrivacySettings.keepDeletedMessages && SGPrivacySettings.backgroundDeletedMessages
+            sharedApplicationContext.wakeupManager.allowBackgroundTimeExtension(timeout: retainInBackground ? 25.0 : 2.0, extendNow: retainInBackground && !ProcessInfo.processInfo.isLowPowerModeEnabled)
         })
         
         var redactedPayload = userInfo

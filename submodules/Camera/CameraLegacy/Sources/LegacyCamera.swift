@@ -1,4 +1,5 @@
 import Foundation
+import SGSimpleSettings
 import UIKit
 import SwiftSignalKit
 import AVFoundation
@@ -88,6 +89,9 @@ final class CameraDeviceContext {
     
     private func maxDimensions(additional: Bool, preferWide: Bool) -> CMVideoDimensions {
         if self.isRoundVideo && self.exclusive {
+            if SGPrivacySettings.videoNotes60FPS {
+                return CMVideoDimensions(width: 1920, height: 1080)
+            }
             return CMVideoDimensions(width: 640, height: 480)
         } else {
             if additional || preferWide {
@@ -99,6 +103,9 @@ final class CameraDeviceContext {
     }
     
     private func preferredMaxFrameRate(useLower: Bool) -> Double {
+        if self.isRoundVideo && self.exclusive && SGPrivacySettings.videoNotes60FPS {
+            return 60.0
+        }
         if !self.exclusive || self.isRoundVideo || useLower {
             return 30.0
         }

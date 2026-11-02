@@ -1,3 +1,4 @@
+import SGSimpleSettings
 import SGStrings
 import SGSettingsUI
 import Foundation
@@ -55,8 +56,10 @@ extension PeerInfoScreenNode {
         switch section {
         case .swiftgram:
             self.controller?.push(sgSettingsController(context: self.context))
+        case .modPrivacy:
+            self.controller?.push(sgModSettingsController(context: self.context))
         case .swiftgramPro:
-            if self.context.sharedContext.immediateSGStatus.status > 1 {
+            if SGPrivacySettings.allowsLocalPro(status: self.context.sharedContext.immediateSGStatus.status) {
                 self.controller?.push(self.context.sharedContext.makeSGProController(context: self.context))
             } else {
                 if let payWallController = self.context.sharedContext.makeSGPayWallController(context: self.context) {

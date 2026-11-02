@@ -1,3 +1,4 @@
+import SGSimpleSettings
 import Foundation
 import UIKit
 import Display
@@ -18,6 +19,7 @@ enum SettingsSection: Int, CaseIterable {
     case edit
     case phone
     case accounts
+    case modPrivacy
     case myProfile
     case wallet
     case proxy
@@ -210,6 +212,9 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     let sgWebSettings = context.currentAppConfiguration.with({ $0 }).sgWebSettings
     items[.swiftgram]!.append(contentsOf: sgPeerInfoSettingsItems(context: context, paymentsEnabled: sgWebSettings.global.paymentsEnabled, presentationData: presentationData, interaction: interaction))
     //
+    items[.modPrivacy]!.append(PeerInfoScreenDisclosureItem(id: 0, text: "Nigga", icon: PresentationResourcesSettings.modPrivacy, action: {
+        interaction.openSettings(.modPrivacy)
+    }))
 
     var appIndex = 1000
     if let settings = data.globalSettings {
@@ -369,7 +374,9 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
     }))
     
     var result: [(AnyHashable, [PeerInfoScreenItem])] = []
-    for section in SettingsSection.allCases {
+    // Keep the mod directly after Swiftgram / Pro and before My Profile.
+    let sectionOrder: [SettingsSection] = [.edit, .phone, .accounts, .swiftgram, .modPrivacy, .myProfile, .proxy, .swiftgramPro, .apps, .shortcuts, .advanced, .payment, .extra, .support]
+    for section in sectionOrder {
         if let sectionItems = items[section], !sectionItems.isEmpty {
             result.append((section, sectionItems))
         }

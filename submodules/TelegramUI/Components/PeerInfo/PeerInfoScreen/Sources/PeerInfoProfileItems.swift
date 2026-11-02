@@ -17,6 +17,7 @@ import WebUI
 import AvatarNode
 import PeerNameColorItem
 import BoostLevelIconComponent
+import UndoUI
 
 private let enabledPublicBioEntities: EnabledEntityTypes = [.allUrl, .mention, .hashtag]
 private let enabledPrivateBioEntities: EnabledEntityTypes = [.allUrl, .mention, .hashtag] // MARK: Swiftgram
@@ -132,7 +133,9 @@ func infoItems(
         let ItemBotAddToChatInfo = 9003
         let ItemVerification = 9004
         let ItemCommunity = 10000
-        
+        // MARK: Swiftgram Mod
+        let ItemMilotaRain = 6100
+
         if let cachedUserData = data.cachedData as? CachedUserData, cachedUserData.flags.contains(.unofficialSecurityRisk) {
             items[.unofficial]!.append(PeerInfoScreenInfoItem(id: 0, title: "", text: .plain(presentationData.strings.PeerInfo_UnofficialSecurityRisk(EnginePeer(user).compactDisplayTitle).string), style: .compact, linkAction: nil))
         }
@@ -403,6 +406,21 @@ func infoItems(
             }
         }
         
+        // MARK: Swiftgram Mod
+        if PeerInfoEmojiRainOverlay.isEnabled(for: user) {
+            let milotaText = presentationData.strings.baseLanguageCode == "ru" ? "Милота 🥰" : "Cuteness 🥰"
+            items[currentPeerInfoSection]!.append(PeerInfoScreenActionItem(id: ItemMilotaRain, text: milotaText, color: .accent, action: { [weak interaction] in
+                // Diagnostics: the haptic confirms the tap reached this closure,
+                // the toast reports where the rain was attached.
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                guard let controller = interaction?.getController() else {
+                    return
+                }
+                let status = PeerInfoEmojiRainOverlay.play(in: controller.view)
+                controller.present(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: "Милота: \(status)", timeout: 3.0, customUndoText: nil), elevatedLayout: false, animateInAsReplacement: false, action: { _ in return false }), in: .window(.root))
+            }))
+        }
+
         if !isMyProfile {
             if !data.isContact, user.botInfo == nil {
                 items[currentPeerInfoSection]!.append(PeerInfoScreenActionItem(id: ItemAddToContacts, text: presentationData.strings.PeerInfo_AddToContacts, action: {

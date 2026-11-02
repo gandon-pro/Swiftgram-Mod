@@ -1386,7 +1386,7 @@ extension ChatControllerImpl {
             let (accountPeer, limits, premiumLimits) = result
             let isPremium = accountPeer?.isPremium ?? false
 
-            strongSelf.present(legacyICloudFilePicker(theme: strongSelf.presentationData.theme, hasMultiselection: !editingMessage, documentTypes: documentTypes, completion: { [weak self] urls in
+            strongSelf.present(legacyICloudFilePicker(theme: strongSelf.presentationData.theme, mode: .import, hasMultiselection: !editingMessage, documentTypes: documentTypes, completion: { [weak self] urls in
                 if let strongSelf = self, !urls.isEmpty {
                     var signals: [Signal<ICloudFileDescription?, NoError>] = []
                     for url in urls {
@@ -1396,6 +1396,13 @@ extension ChatControllerImpl {
                     |> deliverOnMainQueue).startStrict(next: { results in
                         if let strongSelf = self {
                             let replyMessageSubject = strongSelf.presentationInterfaceState.interfaceState.replyMessageSubject
+
+                            if results.contains(where: { $0 == nil }) {
+                                let strings = strongSelf.presentationData.strings
+                                let text = strings.baseLanguageCode.hasPrefix("ru") ? "Не удалось прочитать выбранный файл. Скачайте его в приложении «Файлы» и выберите снова." : "Could not read the selected file. Download it in Files and select it again."
+                                strongSelf.present(textAlertController(context: strongSelf.context, title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: strings.Common_OK, action: {})]), in: .window(.root))
+                                return
+                            }
 
                             for item in results {
                                 if let item = item {

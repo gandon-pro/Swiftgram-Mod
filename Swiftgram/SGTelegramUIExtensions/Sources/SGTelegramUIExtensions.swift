@@ -1,5 +1,6 @@
 import SGDebugUI
 import SGSettingsUI
+import SGSimpleSettings
 import SGStrings
 import UndoUI
 //
@@ -43,7 +44,7 @@ func sgHandleInternalUrlRoute(context: AccountContext, parsedUrl: URL, navigatio
         }
         return true
     case "pro", "premium", "buy":
-        if context.sharedContext.immediateSGStatus.status > 1 {
+        if SGPrivacySettings.allowsLocalPro(status: context.sharedContext.immediateSGStatus.status) {
             navigationController?.pushViewController(context.sharedContext.makeSGProController(context: context))
         } else if let lastViewController = navigationController?.viewControllers.last as? ViewController {
             if let payWallController = context.sharedContext.makeSGPayWallController(context: context) {

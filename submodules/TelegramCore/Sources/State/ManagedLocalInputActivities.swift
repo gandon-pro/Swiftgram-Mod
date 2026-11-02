@@ -1,4 +1,5 @@
 import Foundation
+import SGSimpleSettings
 import Postbox
 import SwiftSignalKit
 internal import TelegramApi
@@ -142,6 +143,19 @@ private func actionFromActivity(_ activity: PeerInputActivity?) -> Api.SendMessa
 }
 
 private func requestActivity(postbox: Postbox, network: Network, accountPeerId: PeerId, peerId: PeerId, threadId: Int64?, activity: PeerInputActivity?) -> Signal<Void, NoError> {
+    if let activity = activity {
+        let privacyActivity: SGPrivateActivity
+        switch activity {
+        case .typingText: privacyActivity = .typing
+        case .recordingVoice, .recordingInstantVideo: privacyActivity = .recording
+        case .uploadingFile, .uploadingPhoto, .uploadingVideo, .uploadingInstantVideo: privacyActivity = .uploading
+        case .speakingInGroupCall: privacyActivity = .call
+        case .playingGame, .choosingSticker, .interactingWithEmoji, .seeingEmojiInteraction: privacyActivity = .interaction
+        }
+        if SGPrivacySettings.suppressActivity(privacyActivity) {
+            return .complete()
+        }
+    }
     return postbox.transaction { transaction -> Signal<Void, NoError> in
         if let peer = transaction.getPeer(peerId) {
             if peerId == accountPeerId {

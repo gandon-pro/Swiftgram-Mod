@@ -3,8 +3,12 @@ import UIKit
 import AVFoundation
 import DeviceModel
 import Camera
+import SGSimpleSettings
 
 func legacyIsDualCameraSupported(forRoundVideo: Bool) -> Bool {
+    if forRoundVideo && SGPrivacySettings.videoNotes60FPS {
+        return false
+    }
     if #available(iOS 13.0, *), AVCaptureMultiCamSession.isMultiCamSupported && !DeviceModel.current.isIpad {
         if forRoundVideo && (ProcessInfo.processInfo.isLowPowerModeEnabled || DeviceModel.current == .iPhoneXR) {
             return false

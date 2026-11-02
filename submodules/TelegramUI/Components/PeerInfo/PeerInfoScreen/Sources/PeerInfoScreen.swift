@@ -175,7 +175,7 @@ enum PeerInfoSettingsSection {
     // MARK: Swiftgram
     case swiftgram
     case swiftgramPro
-    //
+    case modPrivacy
     case avatar
     case edit
     case proxy
