@@ -4,17 +4,26 @@ import os
 import plistlib
 import re
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 
 def configure(root: Path, api_id: str, api_hash: str):
     if not re.fullmatch(r"[1-9][0-9]{0,9}", api_id) or not re.fullmatch(r"[0-9a-fA-F]{32}", api_hash):
         raise ValueError("Set valid TELEGRAM_API_ID and TELEGRAM_API_HASH repository secrets in Settings > Secrets and variables > Actions.")
-    profile_data = subprocess.check_output([
-        "openssl", "smime", "-inform", "der", "-verify", "-noverify", "-in",
-        str(root / "build-system/fake-codesigning/profiles/Telegram.mobileprovision")
-    ], stderr=subprocess.DEVNULL)
-    profile = plistlib.loads(profile_data)
+    profile = None
+    for path in sorted((root / "build-system/fake-codesigning/profiles").glob("*.mobileprovision")):
+        profile_data = subprocess.check_output([
+            "openssl", "smime", "-inform", "der", "-verify", "-noverify", "-in", str(path)
+        ], stderr=subprocess.DEVNULL)
+        current = plistlib.loads(profile_data)
+        expiration = current["ExpirationDate"].replace(tzinfo=timezone.utc)
+        if expiration <= datetime.now(timezone.utc):
+            raise ValueError(f"Test provisioning profile expired: {path.name}. Renew all profiles with mod-tools/renew-test-profiles.py.")
+        if path.name == "Telegram.mobileprovision":
+            profile = current
+    if profile is None:
+        raise ValueError("Telegram.mobileprovision is missing from the test signing profiles")
     team_id = profile["TeamIdentifier"][0]
     app_identifier = profile["Entitlements"]["application-identifier"]
     if not app_identifier.startswith(team_id + "."):
