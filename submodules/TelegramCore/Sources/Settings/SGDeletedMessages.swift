@@ -103,11 +103,11 @@ func sgArchiveDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [Me
             changed = true
         }
     }
-    // Each row has at most 4096 characters; the user-selected row limit also
-    // bounds text storage without an unrelated 512 KB cap truncating it early.
-    while archive.count > SGPrivacySettings.deletedMessagesLimit {
-        let expired = archive.removeFirst()
-        sgRemoveRetainedRows(transaction: transaction, messages: [expired])
+    // Unlimited mode skips eviction in both the archive and retained chat rows.
+    let overflow = SGPrivacySettings.deletedMessagesOverflow(count: archive.count)
+    if overflow > 0 {
+        sgRemoveRetainedRows(transaction: transaction, messages: Array(archive.prefix(overflow)))
+        archive.removeFirst(overflow)
         changed = true
     }
     if changed {
@@ -123,7 +123,7 @@ func sgArchiveDeletedMessages(transaction: Transaction, ids: [MessageId]) -> [Me
 public func sgTrimDeletedMessages(postbox: Postbox) -> Signal<Void, NoError> {
     return postbox.transaction { transaction -> Void in
         var messages = transaction.getPreferencesEntry(key: sgDeletedMessagesKey)?.get(SGDeletedMessages.self)?.messages ?? []
-        let overflow = max(0, messages.count - SGPrivacySettings.deletedMessagesLimit)
+        let overflow = SGPrivacySettings.deletedMessagesOverflow(count: messages.count)
         guard overflow > 0 else { return }
         sgRemoveRetainedRows(transaction: transaction, messages: Array(messages.prefix(overflow)))
         messages.removeFirst(overflow)

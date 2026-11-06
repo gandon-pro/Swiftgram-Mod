@@ -57,6 +57,8 @@ struct SGVoiceChangerTests {
         }
         defaults.set("unknown-future-effect", forKey: key)
         precondition(SGPrivacySettings.voiceEffect == .off)
+        precondition(SGVoiceEffect.female.title(russian: true) == "Женский голос")
+        precondition(SGVoiceEffect.female.title(russian: false) == "Female voice")
 
         for rate in [16000.0, 48000.0] {
             let tone = (0 ..< Int(rate)).map { i in
@@ -75,8 +77,22 @@ struct SGVoiceChangerTests {
                     precondition(abs(spectralPeak(whole, rate: rate) - 165) <= 12)
                 } else if effect == .high {
                     precondition(abs(spectralPeak(whole, rate: rate) - 297) <= 12)
+                } else if effect == .female {
+                    let peak = spectralPeak(whole, rate: rate)
+                    precondition(abs(peak - 275) <= 12)
+                    precondition(whole != apply(.high, tone, chunks: [960], rate: rate), "Female voice must not alias the existing high-pitch preset")
+                    print("Female voice peak at \(Int(rate)) Hz sample rate: \(peak) Hz (input 220 Hz)")
                 }
             }
+            // The female preset should reduce bass relative to the speech band.
+            func rms(_ inputHz: Double) -> Double {
+                let tone = (0 ..< Int(rate)).map { i in
+                    Int16((8000 * sin(2 * Double.pi * inputHz * Double(i) / rate)).rounded())
+                }
+                let output = apply(.female, tone, chunks: [127, 960], rate: rate).dropFirst(Int(rate / 5))
+                return sqrt(output.reduce(0.0) { $0 + Double($1) * Double($1) } / Double(output.count))
+            }
+            precondition(rms(60) < rms(1000) * 0.8, "Female preset must reduce low-frequency weight")
         }
         let extremes: [Int16] = (0 ..< 10000).map { $0 % 2 == 0 ? Int16.min : Int16.max }
         for effect in SGVoiceEffect.allCases {

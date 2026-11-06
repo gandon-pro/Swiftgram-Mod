@@ -18,7 +18,7 @@ private enum SGModSection: Int32, SGItemListSection {
 }
 
 private enum SGModToggle: Hashable {
-    case pseudoPro, ghost, deleted, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions
+    case pseudoPro, ghost, deleted, unlimitedArchive, background, video60, online, afterSend, typing, recording, uploads, reads, stories, interactions
 }
 
 private enum SGModLink: Hashable {
@@ -58,6 +58,11 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
             SGPrivacySettings.ghostHideInteractions = value
         case .background:
             SGPrivacySettings.backgroundDeletedMessages = value
+        case .unlimitedArchive:
+            SGPrivacySettings.unlimitedDeletedMessages = value
+            if !value {
+                let _ = sgTrimDeletedMessages(postbox: context.account.postbox).startStandalone()
+            }
         case .video60:
             SGPrivacySettings.videoNotes60FPS = value
         case .deleted:
@@ -140,13 +145,15 @@ public func sgModSettingsController(context: AccountContext) -> ViewController {
         entries.append(.searchInput(id: counter.count, section: .deleted, title: NSAttributedString(string: ru ? "Лимит архива: " : "Archive limit: ", font: Font.regular(ItemListPresentationData(data).fontSize.itemListBaseFontSize), textColor: data.theme.list.itemPrimaryTextColor), text: archiveLimitInput, placeholder: "200"))
         let validArchiveLimit = Int(archiveLimitInput).map { (1 ... 10000).contains($0) } ?? false
         entries.append(.action(id: counter.count, section: .deleted, actionType: "saveArchiveLimit", text: ru ? "Сохранить лимит архива" : "Save archive limit", kind: validArchiveLimit ? .generic : .disabled))
-        entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Введите целое число от 1 до 10000 и нажмите «Сохранить». Текущий лимит: \(SGPrivacySettings.deletedMessagesLimit). При уменьшении старейшие записи удаляются из архива и чатов." : "Enter an integer from 1 to 10000, then tap Save. Current limit: \(SGPrivacySettings.deletedMessagesLimit). Reducing it removes the oldest retained entries from the archive and chats."))
-        entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Удалённые сообщения остаются в чате с прозрачностью 50%: до \(SGPrivacySettings.deletedMessagesLimit) записей, включая обычное автоудаление в облачных чатах. Сохраняются текст и ссылки на обычные медиа; не загруженные файлы могут быть недоступны. Секретные чаты, одноразовые и самоуничтожающиеся медиа исключены. Выключение убирает сохранённые сообщения из чата; архив очищается отдельно." : "Deleted messages remain at 50% opacity: up to \(SGPrivacySettings.deletedMessagesLimit) entries, including ordinary cloud-chat auto-delete. Keeps text and ordinary media references; files not downloaded may be unavailable. Secret chats, view-once and self-destructing media are excluded. Switching off removes retained chat messages; clear the archive separately."))
+        entries.append(.toggle(id: counter.count, section: .deleted, settingName: .unlimitedArchive, value: SGPrivacySettings.unlimitedDeletedMessages, text: ru ? "Бесконечный архив" : "Unlimited archive", enabled: true))
+        let archiveLimitDescription = SGPrivacySettings.unlimitedDeletedMessages ? (ru ? "без ограничений по количеству" : "no entry count limit") : (ru ? "до \(SGPrivacySettings.deletedMessagesLimit) записей" : "up to \(SGPrivacySettings.deletedMessagesLimit) entries")
+        entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Введите целое число от 1 до 10000 и нажмите «Сохранить». Сохранённый лимит: \(SGPrivacySettings.deletedMessagesLimit). Бесконечный архив игнорирует этот лимит. При его выключении старейшие записи сверх лимита удаляются из архива и чатов. Размер архива ограничен свободным местом на устройстве." : "Enter an integer from 1 to 10000, then tap Save. Saved limit: \(SGPrivacySettings.deletedMessagesLimit). Unlimited archive ignores this limit. Turning it off removes the oldest entries above the saved limit from the archive and chats. Archive size depends on available device storage."))
+        entries.append(.notice(id: counter.count, section: .deleted, text: ru ? "Удалённые сообщения остаются в чате с прозрачностью 50%: \(archiveLimitDescription), включая обычное автоудаление в облачных чатах. Сохраняются текст и ссылки на обычные медиа; не загруженные файлы могут быть недоступны. Секретные чаты, одноразовые и самоуничтожающиеся медиа исключены. Выключение убирает сохранённые сообщения из чата; архив очищается отдельно." : "Deleted messages remain at 50% opacity: \(archiveLimitDescription), including ordinary cloud-chat auto-delete. Keeps text and ordinary media references; files not downloaded may be unavailable. Secret chats, view-once and self-destructing media are excluded. Switching off removes retained chat messages; clear the archive separately."))
         entries.append(.toggle(id: counter.count, section: .camera, settingName: .video60, value: SGPrivacySettings.videoNotes60FPS, text: ru ? "Кружки: 60 FPS" : "Video messages: 60 FPS", enabled: true))
         entries.append(.notice(id: counter.count, section: .camera, text: ru ? "Выключено — стандартные 30 FPS. В режиме 60 FPS используется одна камера: фронтальная или задняя, с переключением при записи. Камера должна поддерживать формат 60 FPS. Изменение применяется при следующем открытии записи кружка." : "Off uses the default 30 FPS. 60 FPS uses one camera at a time, front or back, with switching while recording. A supported 60 FPS camera format is required. Changes apply the next time video-message recording opens."))
         entries.append(.header(id: counter.count, section: .voice, text: ru ? "Голосовые сообщения" : "Voice messages", badge: nil))
         entries.append(.oneFromManySelector(id: counter.count, section: .voice, settingName: "voiceEffect", text: ru ? "Войсченджер" : "Voice changer", value: SGPrivacySettings.voiceEffect.title(russian: ru), enabled: true))
-        entries.append(.notice(id: counter.count, section: .voice, text: ru ? "Эффект применяется к новым голосовым сообщениям и слышен в предпрослушивании перед отправкой. Выберите «Без эффекта», чтобы выключить. Уже записанные фрагменты, кружки и звонки не меняются." : "Applies to new voice recordings and is audible in the preview before sending. Select Off to disable. Existing recorded segments, video messages and calls are unchanged."))
+        entries.append(.notice(id: counter.count, section: .voice, text: ru ? "Эффект применяется к новым голосовым сообщениям и слышен в предпрослушивании перед отправкой. «Женский голос» повышает тон и осветляет тембр; результат зависит от исходного голоса. Выберите «Без эффекта», чтобы выключить. Уже записанные фрагменты, кружки и звонки не меняются." : "Applies to new voice recordings and is audible in the preview before sending. Female voice raises pitch and brightens the tone; the result depends on your original voice. Select Off to disable. Existing recorded segments, video messages and calls are unchanged."))
         let state = ItemListControllerState(presentationData: ItemListPresentationData(data), title: .text("Nigga"), leftNavigationButton: nil, rightNavigationButton: nil, backNavigationButton: ItemListBackButton(title: data.strings.Common_Back))
         return (state, (ItemListNodeState(presentationData: ItemListPresentationData(data), entries: entries, style: .blocks, ensureVisibleItemTag: nil), arguments))
     }

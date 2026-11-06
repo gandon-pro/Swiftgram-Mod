@@ -4,7 +4,7 @@ import Foundation
 struct SGPrivacySettingsTests {
     static func main() {
         let defaults = UserDefaults.standard
-        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
+        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "unlimitedDeletedMessages", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
         let old = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, old) {
@@ -32,6 +32,22 @@ struct SGPrivacySettingsTests {
         precondition(SGPrivacySettings.allowsLocalPro(status: 2), "Disabling pseudo-Pro must preserve real Pro access")
         precondition(!SGPrivacySettings.ghostMode)
         precondition(SGPrivacySettings.deletedMessagesLimit == 200)
+        precondition(!SGPrivacySettings.unlimitedDeletedMessages)
+        for count in [0, 199, 200] {
+            precondition(SGPrivacySettings.deletedMessagesOverflow(count: count) == 0)
+        }
+        precondition(SGPrivacySettings.deletedMessagesOverflow(count: 201) == 1)
+        SGPrivacySettings.unlimitedDeletedMessages = true
+        precondition(defaults.bool(forKey: "sg.mod.unlimitedDeletedMessages"))
+        for count in [0, 201, 10001, 100000, Int.max] {
+            precondition(SGPrivacySettings.deletedMessagesOverflow(count: count) == 0)
+        }
+        SGPrivacySettings.deletedMessagesLimit = 123
+        precondition(SGPrivacySettings.deletedMessagesOverflow(count: 100000) == 0, "Saving a finite limit must not evict unlimited history")
+        SGPrivacySettings.unlimitedDeletedMessages = false
+        precondition(SGPrivacySettings.deletedMessagesLimit == 123, "Keep the saved finite limit when unlimited mode is disabled")
+        precondition(SGPrivacySettings.deletedMessagesOverflow(count: 100000) == 99877)
+        precondition(!defaults.bool(forKey: "sg.mod.unlimitedDeletedMessages"))
         SGPrivacySettings.deletedMessagesLimit = 3500
         precondition(SGPrivacySettings.deletedMessagesLimit == 3500)
         precondition(defaults.integer(forKey: "sg.mod.deletedMessagesLimit") == 3500)
@@ -71,6 +87,6 @@ struct SGPrivacySettingsTests {
         precondition(SGPrivacySettings.ghostMode, "Existing ghost mode must migrate")
         SGPrivacySettings.ghostMode = false
         precondition(!SGPrivacySettings.hideOnline)
-        print("PASS: independent ghost controls, master persistence, migration, story views, call exclusion, FPS/background preferences")
+        print("PASS: unlimited archive persistence and eviction policy; independent ghost controls, migration, story views, call exclusion, FPS/background preferences")
     }
 }

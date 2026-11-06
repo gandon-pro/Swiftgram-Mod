@@ -1,13 +1,14 @@
 import Foundation
 
 public enum SGVoiceEffect: String, CaseIterable {
-    case off, deep, high, robot
+    case off, deep, high, female, robot
 
     public func title(russian: Bool) -> String {
         switch self {
         case .off: return russian ? "Без эффекта" : "Off"
         case .deep: return russian ? "Низкий голос" : "Deep voice"
         case .high: return russian ? "Высокий голос" : "High voice"
+        case .female: return russian ? "Женский голос" : "Female voice"
         case .robot: return russian ? "Робот" : "Robot"
         }
     }
@@ -24,6 +25,11 @@ public final class SGVoiceChanger {
     private var writeIndex = 0
     private var pitchPhase = 0.0
     private var carrierPhase = 0.0
+    private let femaleHighPassCoefficient: Double
+    private let femaleBrightnessCoefficient: Double
+    private var previousFemaleInput = 0.0
+    private var femaleHighPass = 0.0
+    private var femaleLowPass = 0.0
 
     public init(effect: SGVoiceEffect, sampleRate: Double) {
         precondition(sampleRate.isFinite && sampleRate >= 8000 && sampleRate <= 192000)
@@ -31,6 +37,8 @@ public final class SGVoiceChanger {
         self.sampleRate = sampleRate
         self.window = (sampleRate * 0.04).rounded()
         self.delay = Array(repeating: 0, count: Int(self.window) + 4)
+        self.femaleHighPassCoefficient = exp(-2 * Double.pi * 120 / sampleRate)
+        self.femaleBrightnessCoefficient = 1 - exp(-2 * Double.pi * 1800 / sampleRate)
     }
 
     private func delayed(_ distance: Double) -> Double {
@@ -44,11 +52,16 @@ public final class SGVoiceChanger {
 
     public func process(_ samples: UnsafeMutablePointer<Int16>, count: Int) {
         guard count > 0, self.effect != .off else { return }
-        let ratio = self.effect == .deep ? 0.75 : 1.35
+        let ratio: Double
+        switch self.effect {
+        case .deep: ratio = 0.75
+        case .female: ratio = 1.25
+        default: ratio = 1.35
+        }
         let phaseStep = abs(1 - ratio) / self.window
         for index in 0 ..< count {
             let input = Double(samples[index])
-            let output: Double
+            var output: Double
             if self.effect == .robot {
                 // Ring modulation produces a mechanical voice at the original tempo.
                 output = input * sin(self.carrierPhase)
@@ -65,6 +78,14 @@ public final class SGVoiceChanger {
                 self.writeIndex = (self.writeIndex + 1) % self.delay.count
                 self.pitchPhase += phaseStep
                 if self.pitchPhase >= 1 { self.pitchPhase -= 1 }
+            }
+            if self.effect == .female {
+                // A modest pitch lift, less bass and a brighter spectral balance.
+                // This is a local DSP preset, not a neural voice conversion model.
+                self.femaleHighPass = self.femaleHighPassCoefficient * (self.femaleHighPass + output - self.previousFemaleInput)
+                self.previousFemaleInput = output
+                self.femaleLowPass += self.femaleBrightnessCoefficient * (self.femaleHighPass - self.femaleLowPass)
+                output = self.femaleHighPass + 0.18 * (self.femaleHighPass - self.femaleLowPass)
             }
             samples[index] = Int16(clamping: Int(output.rounded()))
         }

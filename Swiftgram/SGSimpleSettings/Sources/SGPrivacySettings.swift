@@ -100,6 +100,18 @@ public enum SGPrivacySettings {
             NotificationCenter.default.post(name: changed, object: nil)
         }
     }
+    public static var unlimitedDeletedMessages: Bool {
+        get { preference("sg.mod.unlimitedDeletedMessages", defaultValue: false) }
+        set { set(newValue, for: "sg.mod.unlimitedDeletedMessages") }
+    }
+
+    /// Keep the finite limit independently so switching back restores it.
+    public static func deletedMessagesOverflow(count: Int) -> Int {
+        guard !unlimitedDeletedMessages else { return 0 }
+        let limit = deletedMessagesLimit
+        return count > limit ? count - limit : 0
+    }
+
     public static var hideTyping: Bool { ghostMode && ghostHideTyping }
     public static var hideReadReceipts: Bool { ghostMode && ghostHideReadReceipts }
     public static var hideStoryViews: Bool { ghostMode && ghostHideStories }
