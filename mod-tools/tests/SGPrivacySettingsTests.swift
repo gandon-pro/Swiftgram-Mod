@@ -4,7 +4,7 @@ import Foundation
 struct SGPrivacySettingsTests {
     static func main() {
         let defaults = UserDefaults.standard
-        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "unlimitedDeletedMessages", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
+        let keys = ["selectedAppIconName", "swiftpseudoPro", "ghostEnabled", "hideOnline", "hideOnlineAfterSend", "deletedMessagesLimit", "unlimitedDeletedMessages", "pastavibeEmojiStatusFileId", "hideTyping", "hideReadReceipts", "hideRecording", "hideUploads", "hideStoryViews", "hideInteractions", "keepDeletedMessages", "backgroundDeletedMessages", "videoNotes60FPS"].map { "sg.mod." + $0 }
         let old = keys.map { defaults.object(forKey: $0) }
         defer {
             for (key, value) in zip(keys, old) {
@@ -30,6 +30,13 @@ struct SGPrivacySettingsTests {
         SGPrivacySettings.swiftpseudoPro = false
         precondition(!SGPrivacySettings.allowsLocalPro(status: 1))
         precondition(SGPrivacySettings.allowsLocalPro(status: 2), "Disabling pseudo-Pro must preserve real Pro access")
+        precondition(SGPrivacySettings.pastavibeEmojiStatusFileId == nil)
+        SGPrivacySettings.pastavibeEmojiStatusFileId = Int64.max
+        precondition(SGPrivacySettings.pastavibeEmojiStatusFileId == Int64.max, "Emoji document IDs must preserve all 64 bits")
+        precondition((defaults.object(forKey: "sg.mod.pastavibeEmojiStatusFileId") as? NSNumber)?.int64Value == Int64.max)
+        SGPrivacySettings.pastavibeEmojiStatusFileId = nil
+        precondition(SGPrivacySettings.pastavibeEmojiStatusFileId == nil)
+        precondition(defaults.object(forKey: "sg.mod.pastavibeEmojiStatusFileId") == nil)
         precondition(!SGPrivacySettings.ghostMode)
         precondition(SGPrivacySettings.deletedMessagesLimit == 200)
         precondition(!SGPrivacySettings.unlimitedDeletedMessages)

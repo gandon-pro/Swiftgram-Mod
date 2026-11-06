@@ -1,8 +1,4 @@
-// MARK: Swiftgram
-import SGSimpleSettings
-import SGSettingsUI
-import SGStrings
-import CountrySelectionUI
+import SGSimpleSettings // MARK: Swiftgram
 import Foundation
 import UIKit
 import Display
@@ -21,14 +17,35 @@ import WebUI
 import AvatarNode
 import PeerNameColorItem
 import BoostLevelIconComponent
+import UndoUI
 
 private let enabledPublicBioEntities: EnabledEntityTypes = [.allUrl, .mention, .hashtag]
 private let enabledPrivateBioEntities: EnabledEntityTypes = [.allUrl, .mention, .hashtag] // MARK: Swiftgram
 
+private func peerVerificationDescriptionEntities(_ verification: PeerVerification) -> [MessageTextEntity] {
+    var result = verification.descriptionEntities
+    for entity in generateTextEntities(verification.description, enabledTypes: [.allUrl]) {
+        let hasOverlappingLink = result.contains(where: { current in
+            switch current.type {
+            case .Url, .TextUrl, .Email:
+                return current.range.overlaps(entity.range)
+            default:
+                return false
+            }
+        })
+        if !hasOverlappingLink {
+            result.append(entity)
+        }
+    }
+    return result
+}
+
 enum InfoSection: Int, CaseIterable {
     case unofficial
     case community
+    // MARK: Swiftgram
     case swiftgram
+    //
     case groupLocation
     case calls
     case personalChannel
@@ -43,7 +60,7 @@ enum InfoSection: Int, CaseIterable {
 }
 
 func infoItems(
-    nearestChatParticipant: (String?, Int32?), showProfileId: Bool, data: PeerInfoScreenData?,
+    nearestChatParticipant: (String?, Int32?), data: PeerInfoScreenData?,
     context: AccountContext,
     presentationData: PresentationData,
     interaction: PeerInfoInteraction,
@@ -60,13 +77,6 @@ func infoItems(
     
     var currentPeerInfoSection: InfoSection = .peerInfo
 
-    // MARK: Swiftgram
-    var sgItemId = 0
-    var idText = ""
-    var isMutualContact = false
-    //    var isUser = false
-    //    let lang = presentationData.strings.baseLanguageCode
-        
     var items: [InfoSection: [PeerInfoScreenItem]] = [:]
     for section in InfoSection.allCases {
         items[section] = []
@@ -123,15 +133,12 @@ func infoItems(
         let ItemBotAddToChatInfo = 9003
         let ItemVerification = 9004
         let ItemCommunity = 10000
-        
+        // MARK: Swiftgram Mod
+        let ItemMilotaRain = 6100
+
         if let cachedUserData = data.cachedData as? CachedUserData, cachedUserData.flags.contains(.unofficialSecurityRisk) {
-            items[.unofficial]!.append(PeerInfoScreenInfoItem(id: 0, title: "", text: .markdown(presentationData.strings.PeerInfo_UnofficialSecurityRisk(EnginePeer(user).compactDisplayTitle).string), style: .compact, linkAction: nil))
+            items[.unofficial]!.append(PeerInfoScreenInfoItem(id: 0, title: "", text: .plain(presentationData.strings.PeerInfo_UnofficialSecurityRisk(EnginePeer(user).compactDisplayTitle).string), style: .compact, linkAction: nil))
         }
-        // MARK: Swiftgram
-        isMutualContact = user.flags.contains(.mutualContact)
-        idText = String(user.id.id._internalGetInt64Value())
-//        isUser = true
-        
         if !callMessages.isEmpty {
             items[.calls]!.append(PeerInfoScreenCallListItem(id: ItemCallList, messages: callMessages))
         }
@@ -399,6 +406,18 @@ func infoItems(
             }
         }
         
+        // MARK: Swiftgram Mod
+        if PeerInfoEmojiRainOverlay.isEnabled(for: user) {
+            let milotaText = presentationData.strings.baseLanguageCode == "ru" ? "Милота 🥰" : "Cuteness 🥰"
+            items[currentPeerInfoSection]!.append(PeerInfoScreenActionItem(id: ItemMilotaRain, text: milotaText, color: .accent, action: { [weak interaction] in
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                guard let controller = interaction?.getController() else {
+                    return
+                }
+                PeerInfoEmojiRainOverlay.play(in: controller.view)
+            }))
+        }
+
         if !isMyProfile {
             if !data.isContact, user.botInfo == nil {
                 items[currentPeerInfoSection]!.append(PeerInfoScreenActionItem(id: ItemAddToContacts, text: presentationData.strings.PeerInfo_AddToContacts, action: {
@@ -526,20 +545,10 @@ func infoItems(
                 }
                                 
                 if let verification = (data.cachedData as? CachedUserData)?.verification {
-                    let description: String
-                    let descriptionString = verification.description
-                    let entities = generateTextEntities(descriptionString, enabledTypes: [.allUrl])
-                    if let entity = entities.first {
-                        let range = NSRange(location: entity.range.lowerBound, length: entity.range.upperBound - entity.range.lowerBound)
-                        let url = (descriptionString as NSString).substring(with: range)
-                        description = descriptionString.replacingOccurrences(of: url, with: "[\(url)](\(url))")
-                    } else {
-                        description = descriptionString
-                    }
                     let attributedPrefix = NSMutableAttributedString(string: "  ")
                     attributedPrefix.addAttribute(ChatTextInputAttributes.customEmoji, value: ChatTextInputTextCustomEmojiAttribute(interactivelySelectedFromPackId: nil, fileId: verification.iconFileId, file: nil), range: NSMakeRange(0, 1))
                     
-                    items[currentPeerInfoSection]!.append(PeerInfoScreenCommentItem(id: ItemVerification, text: description, attributedPrefix: attributedPrefix, useAccentLinkColor: false, linkAction: { action in
+                    items[currentPeerInfoSection]!.append(PeerInfoScreenCommentItem(id: ItemVerification, text: verification.description, entities: peerVerificationDescriptionEntities(verification), attributedPrefix: attributedPrefix, useAccentLinkColor: false, linkAction: { action in
                         if case let .tap(url) = action, let navigationController = interaction.getController()?.navigationController as? NavigationController {
                             context.sharedContext.openExternalUrl(context: context, urlContext: .generic, url: url, forceExternal: false, presentationData: presentationData, navigationController: navigationController, dismissInput: {})
                         }
@@ -560,9 +569,7 @@ func infoItems(
             }
         }
     } else if case let .channel(channel) = data.peer {
-        // MARK: Swiftgram
-        idText = "-100" + String(channel.id.id._internalGetInt64Value())
-        let ItemSGRecentActions = 20
+        let ItemSGRecentActions = 20 // MARK: Swiftgram
         
         let ItemUsername = 1
         let ItemUsernameInfo = 2
@@ -707,21 +714,10 @@ func infoItems(
                 }
                 
                 if let verification = (data.cachedData as? CachedChannelData)?.verification {
-                    let description: String
-                    let descriptionString = verification.description
-                    let entities = generateTextEntities(descriptionString, enabledTypes: [.allUrl])
-                    if let entity = entities.first {
-                        let range = NSRange(location: entity.range.lowerBound, length: entity.range.upperBound - entity.range.lowerBound)
-                        let url = (descriptionString as NSString).substring(with: range)
-                        description = descriptionString.replacingOccurrences(of: url, with: "[\(url)](\(url))")
-                    } else {
-                        description = descriptionString
-                    }
-                    
                     let attributedPrefix = NSMutableAttributedString(string: "  ")
                     attributedPrefix.addAttribute(ChatTextInputAttributes.customEmoji, value: ChatTextInputTextCustomEmojiAttribute(interactivelySelectedFromPackId: nil, fileId: verification.iconFileId, file: nil), range: NSMakeRange(0, 1))
                     
-                    items[currentPeerInfoSection]!.append(PeerInfoScreenCommentItem(id: 800, text: description, attributedPrefix: attributedPrefix, useAccentLinkColor: false, linkAction: { action in
+                    items[currentPeerInfoSection]!.append(PeerInfoScreenCommentItem(id: 800, text: verification.description, entities: peerVerificationDescriptionEntities(verification), attributedPrefix: attributedPrefix, useAccentLinkColor: false, linkAction: { action in
                         if case let .tap(url) = action, let navigationController = interaction.getController()?.navigationController as? NavigationController {
                             context.sharedContext.openExternalUrl(context: context, urlContext: .generic, url: url, forceExternal: false, presentationData: presentationData, navigationController: navigationController, dismissInput: {})
                         }
@@ -855,9 +851,6 @@ func infoItems(
             }
         }
     } else if case let .legacyGroup(group) = data.peer {
-        // MARK: Swiftgram
-        idText = String(group.id.id._internalGetInt64Value())
-         
         if let cachedData = data.cachedData as? CachedGroupData {
             let aboutText: String?
             if group.isFake {
@@ -935,137 +928,7 @@ func infoItems(
         }
     }
     
-    // MARK: Swiftgram
-    if showProfileId {
-        items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: sgItemId, label: "id: \(idText)", text: "", textColor: .primary, action: nil, longTapAction: { sourceNode in
-            interaction.openPeerInfoContextMenu(.copy(idText), sourceNode, nil)
-        }, requestLayout: { _ in
-            interaction.requestLayout(false)
-        }))
-        sgItemId += 1
-    }
-    
-    if SGSimpleSettings.shared.showDC {
-        var dcId: Int? = nil
-//        var dcLocation: String = ""
-        var phoneCountryText = ""
-        
-        var dcLabel = ""
-        var dcText: String = ""
-        
-        if let cachedData = data.cachedData as? CachedUserData, let phoneCountry = cachedData.peerStatusSettings?.phoneCountry {
-            var countryName = ""
-            let countriesConfiguration = context.currentCountriesConfiguration.with { $0 }
-            if let country = countriesConfiguration.countries.first(where: { $0.id == phoneCountry }) {
-                countryName = country.localizedName ?? country.name
-            } else if phoneCountry == "FT" {
-                countryName = presentationData.strings.Chat_NonContactUser_AnonymousNumber
-            } else if phoneCountry == "TS" {
-                countryName = "Test"
-            }
-            phoneCountryText = emojiFlagForISOCountryCode(phoneCountry) + " " + countryName
-        }
-        if let peer = data.peer, let smallProfileImage = peer.smallProfileImage, let cloudResource = smallProfileImage.resource as? CloudPeerPhotoSizeMediaResource {
-            dcId = cloudResource.datacenterId
-            
-//            switch (dcId) {
-//                case 1:
-//                    dcLocation = "Miami"
-//                case 2:
-//                    dcLocation = "Amsterdam"
-//                case 3:
-//                    dcLocation = "Miami"
-//                case 4:
-//                    dcLocation = "Amsterdam"
-//                case 5:
-//                    dcLocation = "Singapore"
-//                default:
-//                    break
-//            }
-        }
-        
-        if let dcId = dcId {
-            dcLabel = "dc: \(dcId)"
-            if phoneCountryText.isEmpty {
-//                if !dcLocation.isEmpty {
-//                    dcLabel += " \(dcLocation)"
-//                }
-            } else {
-                dcText = "\(phoneCountryText)"
-            }
-        } else if !phoneCountryText.isEmpty {
-            dcLabel = "dc: ?"
-            dcText = phoneCountryText
-        }
-
-        if !dcText.isEmpty || !dcLabel.isEmpty {
-            items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: sgItemId, label: dcLabel, text: dcText, textColor: .primary, action: nil, longTapAction: { sourceNode in
-                interaction.openPeerInfoContextMenu(.aboutDC, sourceNode, nil)
-            }, requestLayout: { _ in
-                interaction.requestLayout(false)
-            }))
-            sgItemId += 1
-        }
-    }
-    
-    if SGSimpleSettings.shared.showCreationDate {
-        if let channelCreationTimestamp = data.channelCreationTimestamp {
-            let creationDateString = stringForDate(timestamp: channelCreationTimestamp, strings: presentationData.strings)
-            items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: sgItemId, label: i18n("Chat.Created", presentationData.strings.baseLanguageCode, creationDateString), text: "", action: nil, longTapAction: { sourceNode in
-                interaction.openPeerInfoContextMenu(.copy(creationDateString), sourceNode, nil)
-            }, requestLayout: { _ in
-                interaction.requestLayout(false)
-            }))
-            sgItemId += 1
-        }
-    }
-    
-    if let invitedAt = nearestChatParticipant.1 {
-        let joinedDateString = stringForDate(timestamp: invitedAt, strings: presentationData.strings)
-        items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: sgItemId, label: i18n("Chat.JoinedDateTitle", presentationData.strings.baseLanguageCode, nearestChatParticipant.0 ?? "chat") , text: joinedDateString, action: nil, longTapAction: { sourceNode in
-            interaction.openPeerInfoContextMenu(.copy(joinedDateString), sourceNode, nil)
-        }, requestLayout: { _ in
-            interaction.requestLayout(false)
-        }))
-        sgItemId += 1
-    }
-    
-    if SGSimpleSettings.shared.showRegDate {
-        var regDateString = ""
-        if let cachedData = data.cachedData as? CachedUserData, let registrationDate = cachedData.peerStatusSettings?.registrationDate {
-            let components = registrationDate.components(separatedBy: ".")
-            if components.count == 2, let first = Int32(components[0]), let second = Int32(components[1]) {
-                let month = first - 1
-                let year = second - 1900
-                regDateString = stringForMonth(strings: presentationData.strings, month: month, ofYear: year)
-            }
-        }
-        if let regDate = data.regDate, regDateString.isEmpty {
-            let regTimestamp = Int32((regDate.from + regDate.to) / 2)
-            switch (context.currentAppConfiguration.with { $0 }.sgWebSettings.global.regdateFormat) {
-                case "year":
-                    regDateString = stringForDateWithoutDayAndMonth(date: Date(timeIntervalSince1970: Double(regTimestamp)), strings: presentationData.strings)
-                case "month":
-                    regDateString = stringForDateWithoutDay(date: Date(timeIntervalSince1970: Double(regTimestamp)), strings: presentationData.strings)
-                default:
-                    regDateString = stringForDate(timestamp: regTimestamp, strings: presentationData.strings)
-            }
-        }
-        if !regDateString.isEmpty {
-            items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: sgItemId, label: i18n("Chat.RegDate", presentationData.strings.baseLanguageCode), text: regDateString, action: nil, longTapAction: { sourceNode in
-                interaction.openPeerInfoContextMenu(.copy(regDateString), sourceNode, nil)
-            }, requestLayout: { _ in
-                interaction.requestLayout(false)
-            }))
-            sgItemId += 1
-        }
-    }
-    if isMutualContact {
-        items[.swiftgram]!.append(PeerInfoScreenLabeledValueItem(id: sgItemId, label: i18n("MutualContact.Label", presentationData.strings.baseLanguageCode), text: "", action: nil, longTapAction: { _ in }, requestLayout: { _ in
-            interaction.requestLayout(false)
-        }))
-        sgItemId += 1
-    }
+    items[.swiftgram]!.append(contentsOf: sgPeerInfoProfileItems(nearestChatParticipant: nearestChatParticipant, data: data, context: context, presentationData: presentationData, interaction: interaction, isMyProfile: isMyProfile)) // MARK: Swiftgram
     
     
     var result: [(AnyHashable, [PeerInfoScreenItem])] = []
@@ -1097,6 +960,8 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
     for section in Section.allCases {
         items[section] = []
     }
+
+    let welcomeMessagesLabel: PeerInfoScreenDisclosureItem.Label = .text(data?.firstWelcomeMessageText ?? presentationData.strings.WelcomeMessages_Off)
     
     if let data = data {
         if case let .user(user) = data.peer {
@@ -1296,10 +1161,11 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
                 let ItemAddToCommunityInfo = 17
                 let ItemCommunity = 18
                 let ItemRemoveFromCommunity = 19
+                let ItemWelcomeMessages = 20
                 
                 let isCreator = channel.flags.contains(.isCreator)
-                
-                if isCreator {
+
+                if channel.hasPermission(.changeInfo) {
                     let linkText: String
                     if let _ = channel.addressName {
                         linkText = presentationData.strings.Channel_Setup_TypePublic
@@ -1323,7 +1189,7 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
                     }))
                 }
                 
-                if isCreator || (channel.adminRights?.rights.contains(.canChangeInfo) == true) {
+                if channel.hasPermission(.changeInfo) {
                     let discussionGroupTitle: String
                     if let _ = data.cachedData as? CachedChannelData {
                         if let peer = data.linkedDiscussionPeer {
@@ -1344,7 +1210,7 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
                     }))
                 }
                 
-                if isCreator || (channel.adminRights?.rights.contains(.canChangeInfo) == true) {
+                if channel.hasPermission(.changeInfo) {
                     let label: String
                     if let cachedData = data.cachedData as? CachedChannelData, case let .known(reactionSettings) = cachedData.reactionSettings {
                         switch reactionSettings.allowedReactions {
@@ -1372,7 +1238,13 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
                     }))
                 }
                 
-                if isCreator || (channel.adminRights?.rights.contains(.canChangeInfo) == true) {
+                if channel.hasPermission(.manageWelcomeMessages) {
+                    items[.peerSettings]!.append(PeerInfoScreenDisclosureItem(id: ItemWelcomeMessages, label: welcomeMessagesLabel, text: presentationData.strings.GroupInfo_WelcomeMessages, icon: PresentationResourcesSettings.welcome, action: {
+                        interaction.editingOpenWelcomeMessages()
+                    }))
+                }
+
+                if channel.hasPermission(.changeInfo) {
                     var colors: [PeerNameColors.Colors] = []
                     if let nameColor = channel.nameColor.flatMap({ context.peerNameColors.get($0, dark: presentationData.theme.overallDarkAppearance) }) {
                         colors.append(nameColor)
@@ -1404,7 +1276,7 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
                     }))
                 }
                 
-                if isCreator || (channel.adminRights?.rights.contains(.canChangeInfo) == true) {
+                if channel.hasPermission(.changeInfo) {
                     let labelString: NSAttributedString
                     if channel.linkedMonoforumId != nil {
                         if case let .channel(monoforumPeer) = data.linkedMonoforumPeer {
@@ -1581,6 +1453,7 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
                 let ItemAddToCommunityInfo = 121
                 let ItemCommunity = 122
                 let ItemRemoveFromCommunity = 123
+                let ItemWelcomeMessages = 124
                 
                 let isCreator = channel.flags.contains(.isCreator)
                 let isPublic = channel.addressName != nil
@@ -1690,7 +1563,13 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
                         }
                     }
                     
-                    if isCreator || channel.adminRights?.rights.contains(.canChangeInfo) == true {
+                    if channel.hasPermission(.manageWelcomeMessages) {
+                        items[.peerDataSettings]!.append(PeerInfoScreenDisclosureItem(id: ItemWelcomeMessages, label: welcomeMessagesLabel, text: presentationData.strings.GroupInfo_WelcomeMessages, icon: PresentationResourcesSettings.welcome, action: {
+                            interaction.editingOpenWelcomeMessages()
+                        }))
+                    }
+
+                    if channel.hasPermission(.changeInfo) {
                         var colors: [PeerNameColors.Colors] = []
                         if let nameColor = channel.nameColor.flatMap({ context.peerNameColors.get($0, dark: presentationData.theme.overallDarkAppearance) }) {
                             colors.append(nameColor)
@@ -1710,7 +1589,7 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
                             interaction.editingOpenNameColorSetup()
                         }))
                     }
-                    
+
                     if (isCreator || (channel.adminRights != nil && channel.hasPermission(.banMembers))) && cachedData.peerGeoLocation == nil, !isPublic, case .known(nil) = cachedData.linkedDiscussionPeerId, !channel.isForumOrMonoForum {
                         items[.peerPublicSettings]!.append(PeerInfoScreenDisclosureItem(id: ItemPreHistory, label: .text(cachedData.flags.contains(.preHistoryEnabled) ? presentationData.strings.GroupInfo_GroupHistoryVisible : presentationData.strings.GroupInfo_GroupHistoryHidden), text: presentationData.strings.GroupInfo_GroupHistoryShort, icon: PresentationResourcesSettings.chatHistory, action: {
                             interaction.editingOpenPreHistorySetup()
@@ -1849,8 +1728,10 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
             let ItemTopicsText = 109
             let ItemAddToCommunity = 110
             let ItemAddToCommunityInfo = 111
+            let ItemWelcomeMessages = 112
             
             var canViewAdminsAndBanned = false
+            let canManageWelcomeMessages = group.hasPermission(.manageWelcomeMessages)
             
             if case .creator = group.role {
                 if let cachedData = data.cachedData as? CachedGroupData {
@@ -1924,22 +1805,24 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
                 
                 canViewAdminsAndBanned = true
             } else if case let .admin(rights, _) = group.role {
-                let label: String
-                if let cachedData = data.cachedData as? CachedGroupData, case let .known(reactionSettings) = cachedData.reactionSettings {
-                    switch reactionSettings.allowedReactions {
-                    case .all:
-                        label = presentationData.strings.PeerInfo_LabelAllReactions
-                    case .empty:
-                        label = presentationData.strings.PeerInfo_ReactionsDisabled
-                    case let .limited(reactions):
-                        label = "\(reactions.count)"
+                if rights.rights.contains(.canChangeInfo) {
+                    let label: String
+                    if let cachedData = data.cachedData as? CachedGroupData, case let .known(reactionSettings) = cachedData.reactionSettings {
+                        switch reactionSettings.allowedReactions {
+                        case .all:
+                            label = presentationData.strings.PeerInfo_LabelAllReactions
+                        case .empty:
+                            label = presentationData.strings.PeerInfo_ReactionsDisabled
+                        case let .limited(reactions):
+                            label = "\(reactions.count)"
+                        }
+                    } else {
+                        label = ""
                     }
-                } else {
-                    label = ""
+                    items[.peerSettings]!.append(PeerInfoScreenDisclosureItem(id: ItemReactions, label: .text(label), text: presentationData.strings.PeerInfo_Reactions, icon: PresentationResourcesSettings.reactions, action: {
+                        interaction.editingOpenReactionsSetup()
+                    }))
                 }
-                items[.peerSettings]!.append(PeerInfoScreenDisclosureItem(id: ItemReactions, label: .text(label), text: presentationData.strings.PeerInfo_Reactions, icon: PresentationResourcesSettings.reactions, action: {
-                    interaction.editingOpenReactionsSetup()
-                }))
                 
                 if rights.rights.contains(.canInviteUsers) {
                     let invitesText: String
@@ -1955,6 +1838,12 @@ func editingItems(data: PeerInfoScreenData?, boostStatus: ChannelBoostStatus?, s
                 }
                 
                 canViewAdminsAndBanned = true
+            }
+
+            if canManageWelcomeMessages {
+                items[.peerSettings]!.append(PeerInfoScreenDisclosureItem(id: ItemWelcomeMessages, label: welcomeMessagesLabel, text: presentationData.strings.GroupInfo_WelcomeMessages, icon: PresentationResourcesSettings.welcome, action: {
+                    interaction.editingOpenWelcomeMessages()
+                }))
             }
             
             if canViewAdminsAndBanned {

@@ -33,7 +33,8 @@ sgsrcs = [
     "//Swiftgram/ChatControllerImplExtension:ChatControllerImplExtension",
     "//Swiftgram/SGSharedAccountContextMigration:SGSharedAccountContextMigration",
     "//Swiftgram/SGOutgoingTranslationLanguageSelection:SGOutgoingTranslationLanguageSelection",
-    "//Swiftgram/SGSafariControllerUrlOpening:SGSafariControllerUrlOpening"
+    "//Swiftgram/SGSafariControllerUrlOpening:SGSafariControllerUrlOpening",
+    "//Swiftgram/SGTelegramUIExtensions:SGTelegramUIExtensions", # MARK: Swiftgram
 ]
 
 filegroup(
@@ -48,6 +49,21 @@ filegroup(
 filegroup(
     name = "TelegramUIAssets",
     srcs = glob(["Images.xcassets/**"]),
+    visibility = ["//visibility:public"],
+)
+
+# Sources the composer flat-rebuild guard test scans. A Bazel-sandboxed XCTest only sees what is
+# declared, so these are wired as `data` on ChatRichTextEditorComposerTestsLib. See
+# ChatRichTextEditorComposer/Tests/ComposerFlatRebuildGuardTests.swift.
+filegroup(
+    name = "composer_state_writer_sources",
+    srcs = [
+        "Sources/CommandChatInputContextPanelNode.swift",
+        "Sources/CommandMenuChatInputContextPanelNode.swift",
+        "Sources/EmojisChatInputContextPanelNode.swift",
+        "Sources/HashtagChatInputContextPanelNode.swift",
+        "Sources/MentionChatInputContextPanelNode.swift",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -78,7 +94,8 @@ swift_library(
     copts = [
         "-warnings-as-errors",
     ],
-    deps = sgdeps + [
+    deps = sgdeps + [ # MARK: Swiftgram
+        "//submodules/CrashReporting:CrashReporting",
         "//third-party/recaptcha:RecaptchaEnterprise",
         "//submodules/SSignalKit/SwiftSignalKit:SwiftSignalKit",
         "//submodules/SSignalKit/SSignalKit:SSignalKit",
@@ -86,6 +103,7 @@ swift_library(
         "//submodules/Display:Display",
         "//submodules/Postbox:Postbox",
         "//submodules/TelegramCore:TelegramCore",
+        "//submodules/WebProxyTransport:WebProxyTransport",
         "//submodules/MtProtoKit:MtProtoKit",
         "//submodules/TelegramPresentationData:TelegramPresentationData",
         "//submodules/AccountContext:AccountContext",
@@ -103,7 +121,8 @@ swift_library(
         "//submodules/Utils/DeviceModel",
         "//submodules/BuildConfig:BuildConfig",
         "//submodules/BuildConfigExtra:BuildConfigExtra",
-        "//submodules/rlottie:RLottieBinding",
+        "//submodules/LottieBinding:LottieBinding",
+        "//submodules/LottieSettings:LottieSettings",
         "//submodules/TelegramUpdateUI:TelegramUpdateUI",
         "//submodules/MergeLists:MergeLists",
         "//submodules/ActivityIndicator:ActivityIndicator",
@@ -151,6 +170,7 @@ swift_library(
         "//submodules/DirectionalPanGesture:DirectionalPanGesture",
         "//submodules/UndoUI:UndoUI",
         "//submodules/PhotoResources:PhotoResources",
+        "//submodules/PassRenderer:PassRenderer",
         "//submodules/TinyThumbnail:TinyThumbnail",
         "//submodules/ImageTransparency:ImageTransparency",
         "//submodules/TelegramNotices:TelegramNotices",
@@ -341,6 +361,10 @@ swift_library(
         "//submodules/TelegramUI/Components/SendInviteLinkScreen",
         "//submodules/TelegramUI/Components/ChatFolderLinkPreviewScreen",
         "//submodules/TelegramUI/Components/SliderContextItem:SliderContextItem",
+        "//submodules/TelegramUI/Components/CoreList:CoreList",
+        "//submodules/TelegramUI/Components/CoreListComponentHost",
+        "//submodules/TelegramUI/Components/News/NewsScreen",
+        "//submodules/TelegramUI/Components/News/NewsFeedSupport",
         "//submodules/TelegramUI/Components/Stories/StoryContainerScreen",
         "//submodules/TelegramUI/Components/CameraScreen",
         "//submodules/TelegramUI/Components/MediaEditorScreen",
@@ -435,9 +459,12 @@ swift_library(
         "//submodules/TelegramUI/Components/Chat/ChatMessageDisableCopyProtectionBubbleContentNode",
         "//submodules/TelegramUI/Components/Chat/ChatMessageGiveawayBubbleContentNode",
         "//submodules/TelegramUI/Components/Chat/ChatMessageBubbleItemNode",
+        "//submodules/TelegramUI/Components/Chat/ChatMessageTransferBubbleContentNode",
+        "//submodules/TelegramUI/Components/Premium/PremiumDiamondComponent",
         "//submodules/TelegramUI/Components/Chat/ChatRecentActionsController",
         "//submodules/TelegramUI/Components/Chat/ChatNavigationButton",
         "//submodules/TelegramUI/Components/Chat/ChatLoadingNode",
+        "//submodules/TelegramUI/Components/DebugCompanionScreen",
         "//submodules/TelegramUI/Components/Settings/PeerNameColorScreen",
         "//submodules/TelegramUI/Components/ContextMenuScreen",
         "//submodules/TelegramUI/Components/PeerAllowedReactionsScreen",
@@ -446,6 +473,7 @@ swift_library(
         "//submodules/TelegramUI/Components/PeerInfo/PeerInfoScreen",
         "//submodules/TelegramUI/Components/Chat/ChatMessageSelectionInputPanelNode",
         "//submodules/TelegramUI/Components/Chat/ChatQrCodeScreen",
+        "//submodules/TelegramUI/Components/QrStudioScreen",
         "//submodules/UIKitRuntimeUtils",
         "//submodules/TelegramUI/Components/SavedMessages/SavedMessagesScreen",
         "//submodules/TelegramUI/Components/Settings/WallpaperGalleryScreen",
@@ -493,6 +521,18 @@ swift_library(
         "//submodules/TelegramUI/Components/SpaceWarpView",
         "//submodules/TelegramUI/Components/MiniAppListScreen",
         "//submodules/TelegramUI/Components/Stars/StarsIntroScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletPeerSelectionScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletReceiveScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletImportScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletSettingsScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletAppsScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletWordsScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletInfoScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletConnectScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletSendScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletTransactionScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletCollectibleScreen",
         "//submodules/TelegramUI/Components/Gifts/GiftOptionsScreen",
         "//submodules/TelegramUI/Components/Gifts/GiftStoreScreen",
         "//submodules/TelegramUI/Components/Gifts/GiftSetupScreen",
@@ -503,6 +543,7 @@ swift_library(
         "//submodules/TelegramUI/Components/Settings/AccountFreezeInfoScreen",
         "//submodules/TelegramUI/Components/JoinSubjectScreen",
         "//submodules/TelegramUI/Components/Chat/QuickShareScreen",
+        "//submodules/TelegramUI/Components/ShareScreen",
         "//submodules/TelegramUI/Components/ButtonComponent",
         "//submodules/Components/BlurredBackgroundComponent",
         "//submodules/TelegramUI/Components/CheckComponent",
@@ -528,6 +569,7 @@ swift_library(
         "//submodules/TelegramUI/Components/Chat/ChatTextInputPanelNode",
         "//submodules/ContactsHelper",
         "//submodules/TelegramUI/Components/GlassBackgroundComponent",
+        "//submodules/TelegramUI/Components/LiquidGlassShapes",
         "//submodules/TelegramUI/Components/Chat/ChatInputAccessoryPanel",
         "//submodules/TelegramUI/Components/Chat/ChatInputMessageAccessoryPanel",
         "//submodules/TelegramUI/Components/Chat/ChatRecordingViewOnceButtonNode",
@@ -536,7 +578,11 @@ swift_library(
         "//submodules/TelegramUI/Components/AttachmentFileController",
         "//submodules/TelegramUI/Components/Contacts/NewContactScreen",
         "//submodules/TelegramUI/Components/Chat/ChatSendAsContextMenu",
-        "//submodules/TelegramUI/Components/NavigationBarImpl",
+        "//submodules/TelegramUI/Components/NavigationBarNode",
+        "//submodules/TelegramUI/Components/NavigationExpansionTransition",
+        "//submodules/TelegramUI/Components/NavigationBarComponent",
+        "//submodules/TelegramUI/Components/GlassBarButtonComponent",
+        "//submodules/TelegramUI/Components/SideColumnLayout",
         "//submodules/TelegramUI/Components/GlobalControlPanelsContext",
         "//submodules/TelegramUI/Components/MediaPlaybackHeaderPanelComponent",
         "//submodules/TelegramUI/Components/LiveLocationHeaderPanelComponent",
@@ -550,6 +596,7 @@ swift_library(
         "//submodules/TelegramUI/Components/Gifts/GiftDemoScreen",
         "//submodules/TelegramUI/Components/EmojiGameStakeScreen",
         "//submodules/TelegramUI/Components/AlertComponent",
+        "//submodules/TelegramUI/Components/AlertComponent/AlertHeaderComponent",
         "//submodules/TelegramUI/Components/Chat/ChatAgeRestrictionAlertController",
         "//submodules/TelegramUI/Components/CocoonInfoScreen",
         "//submodules/TelegramUI/Components/ProxyServerPreviewScreen",
@@ -568,6 +615,9 @@ swift_library(
         "//submodules/TelegramUI/Components/RichTextEditor:RichTextEditorUIKit",
         "//submodules/TelegramUI/Components/RichTextEditorMediaView",
         "//submodules/TelegramUI/Components/Chat/ChatRichTextEditorComposer",
+        "//submodules/WalletContext",
+        "//submodules/PasscodeCore",
+        "//submodules/MTProtoRustEngine:MTProtoRustEngine",
     ] + select({
         "@build_bazel_rules_apple//apple:ios_arm64": appcenter_targets,
         "//build-system:ios_sim_arm64": [],

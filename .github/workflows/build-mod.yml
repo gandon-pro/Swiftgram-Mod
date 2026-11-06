@@ -1,6 +1,11 @@
 name: Build Swiftgram Mod
 
 on:
+  push:
+    branches: [master]
+    paths:
+      - versions.json
+      - .github/workflows/build-mod.yml
   workflow_dispatch:
     inputs:
       mode:
@@ -15,13 +20,16 @@ on:
 permissions:
   contents: read
 
+env:
+  BUILD_IPA: ${{ github.event_name == 'push' || inputs.mode == 'ipa' }}
+
 concurrency:
   group: swiftgram-mod-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   build:
-    runs-on: macos-26-intel
+    runs-on: xcode-27
     timeout-minutes: 180
     steps:
       - name: Check out sources
@@ -78,27 +86,32 @@ jobs:
       - name: Test alternate app icon packaging
         run: python3 mod-tools/tests/test_app_icons.py
 
+      - name: Test profile emoji rain on iOS simulator
+        if: inputs.mode == 'check'
+        timeout-minutes: 15
+        run: bash mod-tools/test-emoji-rain-ui.sh
+
       - name: Install the Metal compiler component
-        if: inputs.mode == 'ipa'
+        if: env.BUILD_IPA == 'true'
         run: xcodebuild -downloadComponent MetalToolchain
 
       - name: Write build configuration from repository secrets
-        if: inputs.mode == 'ipa'
+        if: env.BUILD_IPA == 'true'
         env:
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: python3 mod-tools/configure-ci.py
 
       - name: Fetch pinned dependencies
-        if: inputs.mode == 'ipa'
+        if: env.BUILD_IPA == 'true'
         run: git submodule update --init --recursive --jobs 4
 
       - name: Install architecture-matched Bazel with checksum verification
-        if: inputs.mode == 'ipa'
+        if: env.BUILD_IPA == 'true'
         run: |
           set -euo pipefail
           version=$(python3 -c 'import json; print(json.load(open("versions.json"))["bazel"].split(":")[0])')
-          binary="bazel-${version}-darwin-x86_64"
+          binary="bazel-${version}-darwin-arm64"
           url="https://github.com/bazelbuild/bazel/releases/download/${version}/${binary}"
           curl --fail --location --retry 3 "$url" --output "$RUNNER_TEMP/$binary"
           curl --fail --location --retry 3 "$url.sha256" --output "$RUNNER_TEMP/bazel.sha256"
@@ -108,12 +121,12 @@ jobs:
           echo "BAZEL_PATH=$RUNNER_TEMP/$binary" >> "$GITHUB_ENV"
 
       - name: Import the upstream test signing identity
-        if: inputs.mode == 'ipa'
+        if: env.BUILD_IPA == 'true'
         run: python3 build-system/Make/ImportCertificates.py --path build-system/fake-codesigning/certs
 
       - name: Restore Bazel build cache
         id: bazel-cache
-        if: inputs.mode == 'ipa'
+        if: env.BUILD_IPA == 'true'
         continue-on-error: true
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -127,7 +140,7 @@ jobs:
 
       - name: Compile iPhone IPA
         id: compile-ipa
-        if: inputs.mode == 'ipa'
+        if: env.BUILD_IPA == 'true'
         run: |
           set -euo pipefail
           python3 mod-tools/prepare-mod-icon.py
@@ -141,7 +154,7 @@ jobs:
             --configuration=release_arm64
 
       - name: Prepare artifact for signing on Windows
-        if: inputs.mode == 'ipa'
+        if: env.BUILD_IPA == 'true'
         run: |
           set -euo pipefail
           mkdir -p build/mod-artifacts
@@ -161,7 +174,7 @@ jobs:
           PY
 
       - name: Upload IPA (no public release)
-        if: inputs.mode == 'ipa'
+        if: env.BUILD_IPA == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: Niggagram-IPA-${{ github.run_number }}
@@ -185,7 +198,7 @@ jobs:
 
       - name: Save Bazel build cache even after a compilation error
         if: >-
-          always() && !cancelled() && inputs.mode == 'ipa' &&
+          always() && !cancelled() && env.BUILD_IPA == 'true' &&
           (steps.compile-ipa.outcome == 'success' || steps.compile-ipa.outcome == 'failure') &&
           steps.bazel-cache.outputs.cache-primary-key != ''
         continue-on-error: true

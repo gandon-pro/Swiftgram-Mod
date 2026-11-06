@@ -1,5 +1,6 @@
 load("@build_bazel_rules_swift//swift:swift.bzl", "swift_library")
 
+# MARK: Swiftgram
 sgdeps = [
     "//Swiftgram/SGSettingsUI:SGSettingsUI",
     "//Swiftgram/SGStrings:SGStrings",
@@ -9,6 +10,12 @@ sgdeps = [
     "//Swiftgram/SGRegDateScheme:SGRegDateScheme",
     "//Swiftgram/SGDebugUI:SGDebugUI",
 ]
+#
+# MARK: Swiftgram
+sgsrcs = [
+    "//Swiftgram/SGPeerInfoRows:SGPeerInfoRows",
+]
+#
 
 
 swift_library(
@@ -16,12 +23,17 @@ swift_library(
     module_name = "PeerInfoScreen",
     srcs = glob([
         "Sources/**/*.swift",
-    ]),
+    ]) + sgsrcs, # MARK: Swiftgram
     copts = [
         "-warnings-as-errors",
     ],
-    deps = sgdeps + [
+    deps = sgdeps + [ # MARK: Swiftgram
+        "//submodules/UrlWhitelist",
+        "//submodules/TelegramUI/Components/NavigationBarNode",
+        "//submodules/TelegramUI/Components/NavigationBarComponent",
+        "//submodules/TelegramUI/Components/NavigationExpansionTransition",
         "//submodules/AccountContext",
+        "//submodules/LottieSettings:LottieSettings",
         "//submodules/AccountUtils",
         "//submodules/ActionSheetPeerItem",
         "//submodules/ActivityIndicator",
@@ -98,9 +110,9 @@ swift_library(
         "//submodules/TelegramUI/Components/PeerReportScreen",
         "//submodules/PhoneNumberFormat",
         "//submodules/PhotoResources",
-        "//submodules/Postbox",
         "//submodules/PremiumUI",
         "//submodules/PresentationDataUtils",
+        "//submodules/QrCode",
         "//submodules/QrCodeUI",
         "//submodules/RadialStatusNode",
         "//submodules/SaveToCameraRoll",
@@ -134,6 +146,10 @@ swift_library(
         "//submodules/UndoUI",
         "//submodules/MediaPlayer:UniversalMediaPlayer",
         "//submodules/WebUI",
+        "//submodules/WalletContext",
+        "//submodules/TelegramUI/Components/Wallet/WalletSendScreen",
+        "//submodules/TelegramUI/Components/Wallet/PeerWalletScreen",
+        "//submodules/TelegramUI/Components/Wallet/WalletGiftStickerMediaComponent",
         "//submodules/TelegramUI/Components/MultiScaleTextNode",
         "//submodules/GridMessageSelectionNode",
         "//submodules/ChatMessageInteractiveMediaBadge",
@@ -182,6 +198,7 @@ swift_library(
         "//submodules/TelegramUI/Components/TextFieldComponent",
         "//submodules/TelegramUI/Components/EdgeEffect",
         "//submodules/TelegramUI/Components/GlassBackgroundComponent",
+        "//submodules/TelegramUI/Components/SideColumnLayout",
         "//submodules/TelegramUI/Components/AlertComponent",
         "//submodules/TelegramUI/Components/AvatarComponent",
         "//submodules/TelegramUI/Components/AlertComponent/AlertTransferHeaderComponent",
