@@ -82,8 +82,13 @@ final class PeerInfoHeaderNode: ASDisplayNode {
             || peer.usernames.contains { $0.flags.contains(.isActive) && $0.username.lowercased() == "pastavibecoding" }
     }
 
+    private var showsModCuteRain: Bool {
+        guard let peer = self.peer, case let .user(user) = peer else { return false }
+        return PeerInfoEmojiRainOverlay.isEnabled(for: user)
+    }
+
     @objc private func showModCuteRain() {
-        guard self.showsModDecorations, let surface = self.controller?.displayNode.view else { return }
+        guard self.showsModCuteRain, let surface = self.controller?.displayNode.view else { return }
         self.modRainOverlay = PeerInfoEmojiRainOverlay.play(in: surface)
     }
     private let isPremiumDisabled: Bool
@@ -1457,7 +1462,7 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         let textSideInset: CGFloat = 36.0
         let expandedAvatarHeight: CGFloat = expandedAvatarListSize.height
         
-        var titleConstrainedSize = CGSize(width: width - stripLeft - stripRight - (self.showsModDecorations ? 80.0 : 0.0) - textSideInset * 2.0 - (isPremium || isVerified || isFake ? 20.0 : 0.0), height: .greatestFiniteMagnitude)
+        var titleConstrainedSize = CGSize(width: width - stripLeft - stripRight - (self.showsModDecorations ? 80.0 : (self.showsModCuteRain ? 44.0 : 0.0)) - textSideInset * 2.0 - (isPremium || isVerified || isFake ? 20.0 : 0.0), height: .greatestFiniteMagnitude)
         if self.navigationRowRightButtonCount > 1 {
             titleConstrainedSize.width -= 60.0
         }
@@ -1774,8 +1779,9 @@ final class PeerInfoHeaderNode: ASDisplayNode {
         }
         
         let showModDecorations = self.showsModDecorations && !state.isEditing && !isSecretChat
-        self.modCuteButton.isHidden = !showModDecorations
-        self.modExpandedCuteButton.isHidden = !showModDecorations
+        let showModCuteRain = self.showsModCuteRain && !state.isEditing && !isSecretChat
+        self.modCuteButton.isHidden = !showModCuteRain
+        self.modExpandedCuteButton.isHidden = !showModCuteRain
         self.modStatusView.isHidden = !showModDecorations || self.modStatusFile == nil
         self.modExpandedStatusView.isHidden = !showModDecorations || self.modStatusFile == nil
         if showModDecorations {
@@ -1793,6 +1799,8 @@ final class PeerInfoHeaderNode: ASDisplayNode {
                 titleHorizontalOffset -= 16
                 titleExpandedHorizontalOffset -= 16
             }
+        }
+        if showModCuteRain {
             transition.updateFrame(view: self.modCuteButton, frame: CGRect(x: nextIconX, y: floor((titleSize.height - 44) / 2), width: 44, height: 44))
             transition.updateFrame(view: self.modExpandedCuteButton, frame: CGRect(x: nextExpandedIconX, y: floor((titleExpandedSize.height - 44) / 2), width: 44, height: 44))
             titleHorizontalOffset -= 22

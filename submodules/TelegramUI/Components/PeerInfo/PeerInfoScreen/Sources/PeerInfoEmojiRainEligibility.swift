@@ -3,7 +3,7 @@ import TelegramCore
 
 extension PeerInfoEmojiRainOverlay {
     static func isEnabled(for user: TelegramUser) -> Bool {
-        let enabledUsernames: Set<String> = ["pastavibecoding"]
+        let enabledUsernames: Set<String> = ["pastavibecoding", "mooorrreeee"]
         var usernames = user.usernames.filter { $0.isActive }.map { $0.username }
         if let addressName = user.addressName {
             usernames.append(addressName)
